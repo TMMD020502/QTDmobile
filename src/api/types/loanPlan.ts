@@ -1,3 +1,4 @@
+export type LoanTermOptiontype = 12 | 24 | 36;
 export interface LoanPlanMetadata {
   [key: string]: string | number | boolean;
 }
@@ -13,7 +14,7 @@ export interface CreateLoanPlanRequest {
   monthlyIncome: number;
   repaymentPlan: string;
   note: string;
-  loanTerm: number;
+  loanTerm: LoanTermOptiontype;
   interestRate: number | undefined;
   metadata: LoanPlanMetadata;
   application: LoanPlanApplication;

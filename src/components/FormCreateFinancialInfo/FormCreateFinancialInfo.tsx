@@ -1,4 +1,3 @@
-/* eslint-disable react-native/no-inline-styles */
 import {
   StyleSheet,
   Text,
@@ -9,25 +8,43 @@ import {
   Switch,
   ScrollView,
   Image,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import InputBackground from '../InputBackground/InputBackground';
 import CurrencyInput from '../CurrencyInput/CurrencyInput';
 import {useTranslation} from 'react-i18next';
 import {Theme} from '../../theme/colors';
-import {financialInfo} from '../../api/services/loan';
+import {
+  financialInfo,
+  getDocuments,
+  getworkflowbyapplicationid,
+  updateFinancialInfo,
+} from '../../api/services/loan';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../navigators/RootNavigator';
 import DocumentPicker, {
   DocumentPickerResponse,
 } from 'react-native-document-picker';
 import {AppIcons} from '../../icons';
-import KeyboardWrapper from '../KeyboardWrapper/KeyboardWrapper';
-
+import {Formik, FormikProps} from 'formik';
+import * as Yup from 'yup';
+import i18n from '../../../i18n';
+import {uploadImage} from '../../api/services/uploadImage';
+import {useRoute} from '@react-navigation/native';
+import {LoanResponse} from '../../api/types/loanworkflowtypes';
+import {getDocumentIds, saveDocumentIds} from '../../../tokenStorage';
 interface FormCreateFinancialInfoProps {
   theme: Theme;
   navigation: StackNavigationProp<RootStackParamList, 'CreateFinancialInfo'>;
   appId: string;
+  fromScreen?: string;
+}
+
+interface FileData {
+  uri: string;
+  type: string;
 }
 
 interface FormData {
@@ -41,15 +58,21 @@ interface FormData {
   monthlyDebt: number;
   monthlyLoanPayment: number;
   files: string[];
+  actionType: string;
 }
 
 const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
   theme,
   navigation,
-  appId,
 }) => {
+  const route = useRoute();
+  const {appId, fromScreen} = route.params as {
+    appId: string;
+    fromScreen?: string;
+  };
   const {t} = useTranslation();
-
+  const formikRef = useRef<FormikProps<FormData>>(null); // Create a ref for Formik
+  const currentLanguage = i18n.language;
   const [formData, setFormData] = useState<FormData>({
     jobTitle: '',
     companyName: '',
@@ -61,78 +84,99 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     monthlyDebt: 0,
     monthlyLoanPayment: 0,
     files: [],
+    actionType: '',
   });
-
+  // const [formDataFile, setFormDataFile] = useState<FileData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<DocumentPickerResponse[]>(
     [],
   );
 
   console.log('selectedFiles:', formData);
-
-  const handleOnchange = (field: keyof FormData, value: any): void => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  // const [savedFile, setSavedFile] = useState(null);
 
   const handleDocumentPick = async () => {
     try {
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
+      const res = await DocumentPicker.pick({
+        type: [DocumentPicker.types.allFiles], // Chọn loại tệp bạn muốn cho phép
       });
+      const File = res[0];
 
-      const file = result[0];
-      setSelectedFiles(prev => [...prev, file]);
+      const file = {
+        uri: res[0].uri,
+        type: res[0].type || 'application/octet-stream',
+        fileName: res[0].name || '',
+      };
+      const uploadResponse = await uploadImage(file);
+      if (uploadResponse) {
+        // 🎯 Hiển thị đầy đủ thông tin phản hồi
+        console.log('✅ Response:', uploadResponse);
+        console.log('📌 Id:', uploadResponse.id);
 
-      const formDataFile = new FormData();
-      formDataFile.append('file', {
-        uri: file.uri,
-        name: file.name,
-        type: file.type,
-      });
-
-      const response = await fetch('https://your-api.com/upload', {
-        method: 'POST',
-        body: formDataFile,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const uploadResult = await response.json();
-      setFormData(prev => ({
-        ...prev,
-        files: [...prev.files, uploadResult.data],
-      }));
-    } catch (err) {
+        setSelectedFiles(prev => [...prev, File]);
+        await saveDocumentIds([uploadResponse.id ?? '']);
+        formikRef.current?.setFieldValue('files', [
+          ...(formikRef.current?.values.files || []),
+          uploadResponse.id,
+        ]);
+      }
+    } catch (err: any) {
       if (DocumentPicker.isCancel(err)) {
-        // User cancelled the picker
+        // Xử lý hủy chọn tệp
+
+        console.log('User cancelled document picker');
       } else {
-        Alert.alert('Error', 'Failed to upload document');
+        // Xử lý lỗi khác
+        if (err.response.status === 413) {
+          Alert.alert(
+            currentLanguage === 'vi'
+              ? '🔴 File có dung lượng quá lớn.'
+              : '🔴 The file is too large.',
+          );
+        }
+        if (err.response) {
+          console.error('🔴 Lỗi từ server:', err.response.data);
+          console.error('📌 Status:', err.response.status);
+          console.error('📌 Headers:', err.response.headers);
+        } else {
+          console.error('❌ Không có phản hồi từ server hoặc lỗi mạng.');
+        }
       }
     }
   };
 
   const handleRemoveFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setFormData(prev => ({
-      ...prev,
-      files: prev.files.filter((_, i) => i !== index),
-    }));
+    formikRef.current?.setFieldValue(
+      'files',
+      formikRef.current?.values.files.filter((_, i) => i !== index),
+    );
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (values: FormData, actionType: string) => {
     try {
       setIsLoading(true);
-      const response = await financialInfo(appId, formData);
+      const {actionType: _, ...filteredValues} = values;
+      if (actionType === 'next') {
+        if ((formikRef.current?.values.files || []).length === 0) {
+          Alert.alert('Lỗi', 'Vui lòng chọn ít nhất một file.');
+          return;
+        }
 
-      if (response) {
-        navigation.replace('AssetCollateral', {appId});
+        console.log('Files before API call:', formikRef.current?.values);
+        console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
+        const response = await financialInfo(appId, filteredValues);
+        if (response.code === 200) {
+          navigation.replace('LoadingWorkflowLoan', {appId});
+        }
+      } else if (actionType === 'update') {
+        const response = await updateFinancialInfo(appId, filteredValues);
+        if (response.code === 200) {
+          navigation.goBack();
+        }
       }
     } catch (error) {
-      console.error('Error submitting financial info:', error);
+      console.log('Error submitting financial info:', error);
       Alert.alert(
         t('notification.title'),
         t('formCreateLoan.financialInfo.submitError'),
@@ -254,6 +298,11 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       height: 16,
       tintColor: 'white',
     },
+    errorText: {
+      color: 'red',
+      fontSize: 12,
+      marginTop: 8,
+    },
   });
 
   // Format file size
@@ -265,198 +314,364 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
+  const validationSchema = Yup.object().shape({
+    jobTitle: Yup.string().required(t('formCreateLoan.errors.missingFields')),
+    companyName: Yup.string().required(
+      t('formCreateLoan.errors.missingFields'),
+    ),
+    companyAddress: Yup.string().required(
+      t('formCreateLoan.errors.missingFields'),
+    ),
+    totalIncome: Yup.number()
+      .min(1000000, t('formCreateLoan.errors.invalidAmount'))
+      .required(t('formCreateLoan.errors.missingFields')),
+    monthlyExpense: Yup.number()
+      .min(0, t('formCreateLoan.errors.invalidAmount'))
+      .required(t('formCreateLoan.errors.missingFields')),
+    monthlySaving: Yup.number()
+      .min(1000000, t('formCreateLoan.errors.invalidAmount'))
+      .required(t('formCreateLoan.errors.missingFields')),
+    monthlyDebt: Yup.number()
+      .min(0, t('formCreateLoan.errors.invalidAmount'))
+      .required(t('formCreateLoan.errors.missingFields')),
+    monthlyLoanPayment: Yup.number()
+      .min(1000000, t('formCreateLoan.errors.invalidAmount'))
+      .required(t('formCreateLoan.errors.missingFields')),
+    files: Yup.array()
+      .of(Yup.string())
+      .min(1, t('formCreateLoan.errors.missingFiles')) // hoặc t('Vui lòng tải lên ít nhất 1 tài liệu')
+      .required(t('formCreateLoan.errors.missingFiles')),
+  });
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getworkflowbyapplicationid(appId);
+        if (data.result) {
+          const createLoanStep = data.result.steps.find(
+            step => step.name === 'create-financial-info',
+          );
+          const lastValidHistory = createLoanStep?.metadata?.histories
+            ?.filter(histories => !histories?.error)
+            .at(-1);
+          if (lastValidHistory) {
+            const financialData =
+              lastValidHistory?.response.approvalProcessResponse?.metadata;
+
+            if (financialData) {
+              const mapLoanToFormData = (loan: LoanResponse): FormData => ({
+                jobTitle: financialData?.jobTitle || '',
+                companyName: financialData?.companyName || '',
+                companyAddress: financialData?.companyAddress || '',
+                hasMarried: financialData?.hasMarried || false,
+                totalIncome: financialData?.totalIncome || 0,
+                monthlyExpense: financialData?.monthlyExpense || 0,
+                monthlySaving: financialData?.monthlySaving || 0,
+                monthlyDebt: financialData?.monthlyDebt || 0,
+                monthlyLoanPayment: financialData?.monthlyLoanPayment || 0,
+                files: [],
+                actionType: '',
+              });
+
+              const converted = mapLoanToFormData(financialData);
+              setFormData(prev => ({
+                ...prev,
+                ...converted,
+              }));
+
+              // Use Formik's setValues if available
+              if (formikRef.current) {
+                formikRef.current.setValues(converted);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching workflow:', error);
+      }
+    };
+
+    fetchData();
+  }, [appId]);
+
   return (
-    <KeyboardWrapper>
-      <ScrollView style={styles.container}>
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.jobTitle')}
-          </Text>
-          <InputBackground
-            placeholder={t('formCreateLoan.financialInfo.jobTitlePlaceholder')}
-            onChangeText={(value: string) => handleOnchange('jobTitle', value)}
-            value={formData.jobTitle}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.companyName')}
-          </Text>
-          <InputBackground
-            placeholder={t(
-              'formCreateLoan.financialInfo.companyNamePlaceholder',
-            )}
-            onChangeText={(value: string) =>
-              handleOnchange('companyName', value)
-            }
-            value={formData.companyName}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.companyAddress')}
-          </Text>
-          <InputBackground
-            placeholder={t(
-              'formCreateLoan.financialInfo.companyAddressPlaceholder',
-            )}
-            onChangeText={(value: string) =>
-              handleOnchange('companyAddress', value)
-            }
-            value={formData.companyAddress}
-          />
-        </View>
-
-        <View style={styles.switchContainer}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.hasMarried')}
-          </Text>
-          <Switch
-            value={formData.hasMarried}
-            onValueChange={value => handleOnchange('hasMarried', value)}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.totalIncome')}
-          </Text>
-          <CurrencyInput
-            placeholder={t(
-              'formCreateLoan.financialInfo.totalIncomePlaceholder',
-            )}
-            onChangeText={(value: number) =>
-              handleOnchange('totalIncome', value)
-            }
-            value={formData.totalIncome}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.monthlyExpense')}
-          </Text>
-          <CurrencyInput
-            placeholder={t(
-              'formCreateLoan.financialInfo.monthlyExpensePlaceholder',
-            )}
-            onChangeText={(value: number) =>
-              handleOnchange('monthlyExpense', value)
-            }
-            value={formData.monthlyExpense}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.monthlySaving')}
-          </Text>
-          <CurrencyInput
-            placeholder={t(
-              'formCreateLoan.financialInfo.monthlySavingPlaceholder',
-            )}
-            onChangeText={(value: number) =>
-              handleOnchange('monthlySaving', value)
-            }
-            value={formData.monthlySaving}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.monthlyDebt')}
-          </Text>
-          <CurrencyInput
-            placeholder={t(
-              'formCreateLoan.financialInfo.monthlyDebtPlaceholder',
-            )}
-            onChangeText={(value: number) =>
-              handleOnchange('monthlyDebt', value)
-            }
-            value={formData.monthlyDebt}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.monthlyLoanPayment')}
-          </Text>
-          <CurrencyInput
-            placeholder={t(
-              'formCreateLoan.financialInfo.monthlyLoanPaymentPlaceholder',
-            )}
-            onChangeText={(value: number) =>
-              handleOnchange('monthlyLoanPayment', value)
-            }
-            value={formData.monthlyLoanPayment}
-          />
-        </View>
-
-        <View style={styles.boxInput}>
-          <Text style={styles.headingTitle}>
-            {t('formCreateLoan.financialInfo.documents')}
-          </Text>
-
-          <View style={styles.uploadSection}>
-            <View style={styles.uploadInfo}>
-              <Image source={AppIcons.infoIcon} style={styles.fileIcon} />
-              <Text style={styles.uploadInfoText}>
-                Hỗ trợ PDF, DOCX, JPG, PNG (Max: 5MB)
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.uploadButton}
-              onPress={handleDocumentPick}>
-              <Image source={AppIcons.upLoad} style={styles.uploadIcon} />
-              <Text style={styles.uploadText}>
-                {t('formCreateLoan.financialInfo.uploadDocument')}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.filesList}>
-              {selectedFiles.map((file, index) => (
-                <View key={index} style={styles.fileItemContainer}>
-                  <View style={styles.fileContent}>
-                    <Image source={AppIcons.infoIcon} style={styles.fileIcon} />
-                    <Text style={styles.fileName} numberOfLines={1}>
-                      {file.name}
-                    </Text>
-                    <Text style={styles.fileSize}>
-                      {formatFileSize(file.size || 0)}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveFile(index)}>
-                    <Image
-                      source={AppIcons.closeIcon}
-                      style={styles.removeIcon}
-                    />
-                  </TouchableOpacity>
+    <Formik
+      initialValues={{...formData, actionType: ''}}
+      validationSchema={validationSchema}
+      onSubmit={values => {
+        console.log('Formik onSubmit called with values:', values);
+        handleSubmit(values, values.actionType);
+      }}
+      innerRef={formikRef}>
+      {({
+        handleChange,
+        handleSubmit: formikHandleSubmit,
+        values,
+        errors,
+        touched,
+        setFieldValue,
+      }) => {
+        console.log('Formik errors:', errors);
+        return (
+          <TouchableWithoutFeedback
+            onPress={Keyboard.dismiss}
+            accessible={false}>
+            <ScrollView style={styles.container}>
+              <View>
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.jobTitle')}
+                  </Text>
+                  <InputBackground
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.jobTitlePlaceholder',
+                    )}
+                    onChangeText={handleChange('jobTitle')}
+                    value={values.jobTitle}
+                  />
+                  {touched.jobTitle && errors.jobTitle && (
+                    <Text style={styles.errorText}>{errors.jobTitle}</Text>
+                  )}
                 </View>
-              ))}
-            </View>
-          </View>
-        </View>
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.companyName')}
+                  </Text>
+                  <InputBackground
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.companyNamePlaceholder',
+                    )}
+                    onChangeText={handleChange('companyName')}
+                    value={values.companyName}
+                  />
+                  {touched.companyName && errors.companyName && (
+                    <Text style={styles.errorText}>{errors.companyName}</Text>
+                  )}
+                </View>
 
-        <TouchableOpacity
-          style={[styles.btn, isLoading && {opacity: 0.7}]}
-          onPress={handleSubmit}
-          disabled={isLoading}>
-          {isLoading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.textWhite}>
-              {t('formCreateLoan.financialInfo.submit')}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardWrapper>
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.companyAddress')}
+                  </Text>
+                  <InputBackground
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.companyAddressPlaceholder',
+                    )}
+                    onChangeText={handleChange('companyAddress')}
+                    value={values.companyAddress}
+                  />
+                  {touched.companyAddress && errors.companyAddress && (
+                    <Text style={styles.errorText}>
+                      {errors.companyAddress}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.switchContainer}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.hasMarried')}
+                  </Text>
+                  <Switch
+                    value={values.hasMarried}
+                    onValueChange={(value: boolean) => {
+                      setFieldValue('hasMarried', value);
+                    }}
+                  />
+                </View>
+
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.totalIncome')}
+                  </Text>
+                  <CurrencyInput
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.totalIncomePlaceholder',
+                    )}
+                    value={values.totalIncome}
+                    onChangeText={(value: number) =>
+                      setFieldValue('totalIncome', value)
+                    }
+                  />
+                  {touched.totalIncome && errors.totalIncome && (
+                    <Text style={styles.errorText}>{errors.totalIncome}</Text>
+                  )}
+                </View>
+
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.monthlyExpense')}
+                  </Text>
+                  <CurrencyInput
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.monthlyExpensePlaceholder',
+                    )}
+                    value={values.monthlyExpense}
+                    onChangeText={(value: number) =>
+                      setFieldValue('monthlyExpense', value)
+                    }
+                  />
+                  {touched.monthlyExpense && errors.monthlyExpense && (
+                    <Text style={styles.errorText}>
+                      {errors.monthlyExpense}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.monthlySaving')}
+                  </Text>
+                  <CurrencyInput
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.monthlySavingPlaceholder',
+                    )}
+                    value={values.monthlySaving}
+                    onChangeText={(value: number) =>
+                      setFieldValue('monthlySaving', value)
+                    }
+                  />
+                  {touched.monthlySaving && errors.monthlySaving && (
+                    <Text style={styles.errorText}>{errors.monthlySaving}</Text>
+                  )}
+                </View>
+
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.monthlyDebt')}
+                  </Text>
+                  <CurrencyInput
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.monthlyDebtPlaceholder',
+                    )}
+                    value={values.monthlyDebt}
+                    onChangeText={(value: number) =>
+                      setFieldValue('monthlyDebt', value)
+                    }
+                  />
+                  {touched.monthlyDebt && errors.monthlyDebt && (
+                    <Text style={styles.errorText}>{errors.monthlyDebt}</Text>
+                  )}
+                </View>
+
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.monthlyLoanPayment')}
+                  </Text>
+                  <CurrencyInput
+                    placeholder={t(
+                      'formCreateLoan.financialInfo.monthlyLoanPaymentPlaceholder',
+                    )}
+                    value={values.monthlyLoanPayment}
+                    onChangeText={(value: number) =>
+                      setFieldValue('monthlyLoanPayment', value)
+                    }
+                  />
+                  {touched.monthlyLoanPayment && errors.monthlyLoanPayment && (
+                    <Text style={styles.errorText}>
+                      {errors.monthlyLoanPayment}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.boxInput}>
+                  <Text style={styles.headingTitle}>
+                    {t('formCreateLoan.financialInfo.documents')}
+                  </Text>
+
+                  <View style={styles.uploadSection}>
+                    <View style={styles.uploadInfo}>
+                      <Image
+                        source={AppIcons.infoIcon}
+                        style={styles.fileIcon}
+                      />
+                      <Text style={styles.uploadInfoText}>
+                        Hỗ trợ PDF, DOCX, JPG, PNG (Max: 5MB)
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.uploadButton}
+                      onPress={handleDocumentPick}>
+                      <Image
+                        source={AppIcons.upLoad}
+                        style={styles.uploadIcon}
+                      />
+                      <Text style={styles.uploadText}>
+                        {t('formCreateLoan.financialInfo.uploadDocument')}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.filesList}>
+                      {selectedFiles.map((file, index) => (
+                        <View key={index} style={styles.fileItemContainer}>
+                          <View style={styles.fileContent}>
+                            <Image
+                              source={AppIcons.infoIcon}
+                              style={styles.fileIcon}
+                            />
+                            <Text style={styles.fileName} numberOfLines={1}>
+                              {file.name}
+                            </Text>
+                            <Text style={styles.fileSize}>
+                              {formatFileSize(file.size || 0)}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.removeButton}
+                            onPress={() => handleRemoveFile(index)}>
+                            <Image
+                              source={AppIcons.closeIcon}
+                              style={styles.removeIcon}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+                {fromScreen === 'InfoCreateLoan' ? (
+                  <TouchableOpacity
+                    style={[styles.btn, isLoading && {opacity: 0.7}]}
+                    onPress={async () => {
+                      setFieldValue('actionType', 'update');
+                      formikHandleSubmit();
+                    }}
+                    disabled={isLoading}>
+                    {isLoading ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.textWhite,
+                          {fontWeight: 'bold', textAlign: 'center'},
+                        ]}>
+                        {currentLanguage === 'vi' ? 'Cập nhật' : 'Update'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.btn, isLoading && {opacity: 0.7}]}
+                    onPress={() => {
+                      console.log('Button pressed');
+                      setFieldValue('actionType', 'next');
+                      formikHandleSubmit();
+                    }}
+                    disabled={isLoading}>
+                    {isLoading ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <Text style={styles.textWhite}>
+                        {t('formCreateLoan.financialInfo.submit')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        );
+      }}
+    </Formik>
   );
 };
-
 export default FormCreateFinancialInfo;

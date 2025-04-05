@@ -4,6 +4,9 @@ const TOKEN_KEYS = {
   ACCESS: 'accessToken',
   REFRESH: 'refreshToken',
   ASSETSAPPROVALPROCESSID: 'assetsApprovalProcessId',
+  LOANPLANAPPROVALPROCESSLD: 'loanplanapprovalprocessld',
+  FINANCIALINFOAPPROVALPROCESSID: 'financialinfoapprovalprocessid',
+  DOCUMENTID: 'documentId',
 } as const;
 
 // Đơn giản hóa error handling
@@ -55,8 +58,8 @@ export const clearTokens = () =>
     'clearing tokens',
   );
 
-export const saveAccessApprovalProcessId = async (approvalProcessId: string) =>
-  await handleStorageOperation(
+export const saveAccessApprovalProcessId = (approvalProcessId: string) =>
+  handleStorageOperation(
     () =>
       AsyncStorage.setItem(
         TOKEN_KEYS.ASSETSAPPROVALPROCESSID,
@@ -71,16 +74,69 @@ export const getAccessApprovalProcessId = () =>
     'getting access ApprovalProcessId',
   );
 
-export const removeAccessApprovalProcessIdn = async () =>
-  await handleStorageOperation(
-    () => AsyncStorage.removeItem(TOKEN_KEYS.ASSETSAPPROVALPROCESSID),
-    'removing access ApprovalProcessId',
+export const saveLoanPlanApprovalProcessId = (
+  loanPlanAprovalProcessId: string,
+) =>
+  handleStorageOperation(
+    () =>
+      AsyncStorage.setItem(
+        TOKEN_KEYS.LOANPLANAPPROVALPROCESSLD,
+        loanPlanAprovalProcessId,
+      ),
+    'saving access LoanPlanApprovalProcessId',
   );
-export const clearAccessApprovalProcessIdn = async () =>
+
+export const getFinancialInfoApprovalProcessId = () =>
+  handleStorageOperation(
+    () => AsyncStorage.getItem(TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID),
+    'getting access LoanPlanApprovalProcessId',
+  );
+export const saveFinancialInfoApprovalProcessId = (
+  financialinfoAprovalProcessId: string,
+) =>
+  handleStorageOperation(
+    () =>
+      AsyncStorage.setItem(
+        TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID,
+        financialinfoAprovalProcessId,
+      ),
+    'saving access LoanPlanApprovalProcessId',
+  );
+
+export const getLoanPlanApprovalProcessId = () =>
+  handleStorageOperation(
+    () => AsyncStorage.getItem(TOKEN_KEYS.LOANPLANAPPROVALPROCESSLD),
+    'getting access LoanPlanApprovalProcessId',
+  );
+export const saveDocumentIds = (documentIds: string[]) =>
+  handleStorageOperation(
+    () =>
+      AsyncStorage.setItem(
+        TOKEN_KEYS.DOCUMENTID,
+        JSON.stringify(documentIds), // Chuyển đổi mảng thành chuỗi JSON
+      ),
+    'saving document IDs',
+  );
+export const getDocumentIds = async (): Promise<string[] | null> =>
+  handleStorageOperation(async () => {
+    const storedIds = await AsyncStorage.getItem(TOKEN_KEYS.DOCUMENTID);
+    return storedIds ? JSON.parse(storedIds) : []; // Chuyển đổi chuỗi JSON thành mảng
+  }, 'getting document IDs');
+export const clearAccessApprovalProcessIdn = async () => {
   await handleStorageOperation(
-    () => AsyncStorage.multiRemove([TOKEN_KEYS.ASSETSAPPROVALPROCESSID]),
+    () =>
+      AsyncStorage.multiRemove([
+        TOKEN_KEYS.ASSETSAPPROVALPROCESSID,
+        TOKEN_KEYS.LOANPLANAPPROVALPROCESSLD,
+        TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID,
+      ]),
     'clearing ApprovalProcessId',
   );
+  await handleStorageOperation(
+    () => AsyncStorage.removeItem(TOKEN_KEYS.DOCUMENTID),
+    'clearing document IDs',
+  );
+};
 export const isTokenExpired = (token: string): boolean => {
   try {
     const [, payload] = token.split('.');

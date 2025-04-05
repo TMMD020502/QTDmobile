@@ -323,20 +323,33 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
 
   // Hàm hiển thị dialog khi nhấn vào step
   const handleStepPress = (step: string) => {
-    console.log(step);
+    console.log('Step' + step);
     if (step === 'create-loan-request') {
       navigation.navigate('CreateLoanRequest', {
         appId,
         fromScreen: 'InfoCreateLoan',
       }); // Điều hướng sang màn hình CreateLoanRequest
     } else if (step === 'add-asset-collateral') {
-      navigation.navigate('AssetCollateral', {appId}); // Điều hướng sang màn hình CreateLoanRequest
+      navigation.navigate('AssetCollateral', {
+        appId,
+        fromScreen: 'InfoCreateLoan',
+      }); // Điều hướng sang màn hình CreateLoanRequest
     } else if (step === 'create-loan-plan') {
-      navigation.navigate('CreateLoanPlan', {appId}); // Điều hướng sang màn hình CreateLoanRequest
+      console.log('Trang hiện tại InfoCreateLoan');
+      navigation.navigate('CreateLoanPlan', {
+        appId,
+        fromScreen: 'InfoCreateLoan',
+      }); // Điều hướng sang màn hình CreateLoanRequest
     } else if (step === 'create-financial-info') {
-      navigation.navigate('CreateFinancialInfo', {appId}); // Điều hướng sang màn hình CreateLoanRequest
+      navigation.navigate('CreateFinancialInfo', {
+        appId,
+        fromScreen: 'InfoCreateLoan',
+      }); // Điều hướng sang màn hình CreateLoanRequest
     } else if (step === 'create-credit-rating') {
-      navigation.navigate('CreditRating', {appId}); // Điều hướng sang màn hình CreateLoanRequest
+      navigation.navigate('CreditRating', {
+        appId,
+        fromScreen: 'InfoCreateLoan',
+      }); // Điều hướng sang màn hình CreateLoanRequest
     } else {
       Alert.alert('Thông báo', `Bạn đã nhấn vào bước: ${step}`, [
         {text: 'OK', onPress: () => console.log('OK Pressed')},
@@ -375,12 +388,14 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
     const allowedSteps = [
       'init',
       'create-loan-request',
-      'add-asset-collateral',
       'create-loan-plan',
       'create-financial-info',
       'create-credit-rating',
+      'add-asset-collateral',
     ];
-    return steps.filter(step => allowedSteps.includes(step));
+    return steps
+      .filter(step => allowedSteps.includes(step))
+      .sort((a, b) => allowedSteps.indexOf(a) - allowedSteps.indexOf(b));
   };
 
   return (

@@ -11,7 +11,7 @@ export type StepName =
   | 'create-loan-plan'
   | 'create-financial-info'
   | 'create-credit-rating';
-
+export type LoanTermOptiontype = 12 | 24 | 36;
 export interface LoanWorkflowResponseS {
   code: number;
   message: string;
@@ -59,6 +59,7 @@ export interface StepMetadata {
 }
 
 export interface History {
+  error: string;
   action: string;
   request: HistoryRequest;
   response: HistoryResponse;
@@ -93,7 +94,6 @@ export interface LoanRequest {
     id: string;
   };
 }
-
 export interface ApprovalProcessResponse {
   id: string;
   type: string;
@@ -112,6 +112,23 @@ export interface ApprovalProcessResponse {
 }
 
 export interface LoanResponse {
+  jobTitle: string;
+  companyName: string;
+  companyAddress: string;
+  hasMarried: boolean;
+  totalIncome: number;
+  monthlyExpense: number;
+  monthlySaving: number;
+  monthlyDebt: number;
+  monthlyLoanPayment: number;
+  //files: string[];
+  totalCapitalRequirement: number;
+  ownCapital: number;
+  proposedLoanAmount: number;
+  monthlyIncome: number;
+  repaymentPlan: string;
+  loanTerm: LoanTermOptiontype;
+  interestRate: number | undefined;
   purpose: string;
   amount: number;
   borrowerType: BorrowerType;

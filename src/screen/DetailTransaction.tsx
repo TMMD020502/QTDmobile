@@ -259,13 +259,17 @@ const DetailTransaction: React.FC<DetailTransactionProps> = ({
         {/* Update other translation paths similarly */}
         <View style={[styles.detailsContainer, styles.gapDetails]}>
           <View style={styles.wrapText}>
-            <Text style={styles.colorText}>{t('totalAssets.transaction.date')}</Text>
+            <Text style={styles.colorText}>
+              {t('totalAssets.transaction.date')}
+            </Text>
             <Text style={[styles.colorText, styles.valueDetail]}>
               {transactionData.date}
             </Text>
           </View>
           <View style={styles.wrapText}>
-            <Text style={styles.colorText}>{t('totalAssets.transaction.code')}</Text>
+            <Text style={styles.colorText}>
+              {t('totalAssets.transaction.code')}
+            </Text>
             <View style={styles.wrapCode}>
               <Text style={[styles.colorText, styles.valueDetail]}>
                 {transactionData.code}
@@ -277,13 +281,17 @@ const DetailTransaction: React.FC<DetailTransactionProps> = ({
             </View>
           </View>
           <View style={styles.wrapText}>
-            <Text style={styles.colorText}>{t('totalAssets.transaction.amount')}</Text>
+            <Text style={styles.colorText}>
+              {t('totalAssets.transaction.amount')}
+            </Text>
             <Text style={[styles.colorText, styles.valueDetail]}>
               {transactionData.money.split(' ')[1]}
             </Text>
           </View>
           <View style={styles.wrapText}>
-            <Text style={styles.colorText}>{t('totalAssets.transaction.source')}</Text>
+            <Text style={styles.colorText}>
+              {t('totalAssets.transaction.source')}
+            </Text>
             <Text style={[styles.colorText, styles.valueDetail]}>
               {t(`totalAssets.transaction.sources.${transactionData.source}`)}
             </Text>
@@ -294,10 +302,14 @@ const DetailTransaction: React.FC<DetailTransactionProps> = ({
           <Text style={styles.noteText}>
             {t('totalAssets.transaction.support.issue')}
           </Text>
-          <TouchableOpacity onPress={confirmAndMakeCall} style={styles.wrapContact}>
+          <TouchableOpacity
+            onPress={confirmAndMakeCall}
+            style={styles.wrapContact}>
             <Image source={AppIcons.supportIcon} style={styles.iconCode} />
             <Text style={styles.colorText}>
-              {t('totalAssets.transaction.support.contact', {phone: phoneNumber})}
+              {t('totalAssets.transaction.support.contact', {
+                phone: phoneNumber,
+              })}
             </Text>
           </TouchableOpacity>
         </View>

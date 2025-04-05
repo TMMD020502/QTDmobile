@@ -2,6 +2,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -56,13 +57,18 @@ const CreateFinancialInfo: React.FC<CreateFinancialInfoProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
           style={{flex: 1}}>
-          <View style={styles.body}>
-            <FormCreateFinancialInfo
-              theme={theme}
-              navigation={navigation}
-              appId={appId}
-            />
-          </View>
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            nestedScrollEnabled={true}
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.body}>
+              <FormCreateFinancialInfo
+                theme={theme}
+                navigation={navigation}
+                appId={appId}
+              />
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </View>
     </SafeAreaView>

@@ -7,6 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import React, {useEffect, useRef, useState} from 'react';
 import DropdownComponent from '../DropdownComponent/DropdownComponent';
@@ -24,12 +28,13 @@ import {
 import {
   getworkflowbyapplicationid,
   loanRequest,
-  uploadLoanRequest,
+  updateLoanRequest,
 } from '../../api/services/loan';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../navigators/RootNavigator';
 import CustomMultiSelect from '../CustomMultiSelect/CustomMultiSelect';
 import {LoanRequest} from '../../api/types/loanworkflowtypes';
+import {useRoute} from '@react-navigation/native';
 
 //import LoanRequestService from './../../api/services/update-loan-request';
 //import axios from 'axios';
@@ -63,10 +68,13 @@ interface FormErrors {
 
 const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
   theme,
-  appId,
-  fromScreen,
   navigation,
 }) => {
+  const route = useRoute();
+  const {appId, fromScreen} = route.params as {
+    appId: string;
+    fromScreen?: string;
+  };
   const currentLanguage = i18n.language;
   const {t} = useTranslation();
 
@@ -136,57 +144,57 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       key2: '',
     },
   });
-  const [isLoadingapi, setIsLoadingapi] = useState(true);
+
   //const [workflowData, setWorkflowData] = useState<LoanApplication | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const data = await getworkflowbyapplicationid(appId);
-
         if (data.result) {
           console.log(
             '⚠️ API trả về dữ liệu ' +
-              data.result.steps[0].metadata.histories.at(-1)?.response
+              data.result.steps.at(-1)?.metadata.histories.at(-1)?.response
                 .approvalProcessResponse?.metadata.purpose,
           );
-        }
-        // setWorkflowData(data); // Cập nhật workflowData từ API
+          const createLoanStep = data.result.steps.find(
+            step => step.name === 'create-loan-request',
+          );
+          const lastValidHistory = createLoanStep?.metadata?.histories
+            ?.filter(histories => !histories?.error) // Lọc ra các phần tử không có 'error'
+            .at(-1); // Lấy phần tử cuối cùng trong danh sách hợp lệ
 
-        setFormData(prev => ({
-          ...prev,
-          purpose:
-            data.result.steps[0].metadata.histories.at(-1)?.response
-              .approvalProcessResponse?.metadata.purpose || '',
-          amount:
-            data.result.steps[0].metadata.histories.at(-1)?.response
-              .approvalProcessResponse?.metadata.amount || 0,
-          borrowerType:
-            (data.result.steps[0].metadata.histories.at(-1)?.response
-              .approvalProcessResponse?.metadata
-              .borrowerType as BorrowerType) || ('' as BorrowerType),
-          loanSecurityType:
-            (data.result.steps[0].metadata.histories.at(-1)?.response
-              .approvalProcessResponse?.metadata
-              .loanSecurityType as LoanSecurityType) ||
-            ('' as LoanSecurityType),
-          loanCollateralTypes:
-            (data.result.steps[0].metadata.histories.at(-1)?.response
-              .approvalProcessResponse?.metadata
-              .loanCollateralTypes as LoanCollateralType[]) ||
-            ('' as LoanCollateralType),
-          note:
-            data.result.steps[0].metadata.histories.at(-1)?.response
-              .approvalProcessResponse?.metadata.note || '',
-          metadata: {
-            key1: 'key1',
-            key2: 'key 2',
-          },
-        }));
+          console.log(createLoanStep);
+          setFormData(prev => ({
+            ...prev,
+            purpose:
+              lastValidHistory?.response.approvalProcessResponse?.metadata
+                .purpose || '',
+            amount:
+              lastValidHistory?.response.approvalProcessResponse?.metadata
+                .amount || 0,
+            borrowerType:
+              (lastValidHistory?.response.approvalProcessResponse?.metadata
+                .borrowerType as BorrowerType) || ('' as BorrowerType),
+            loanSecurityType:
+              (lastValidHistory?.response.approvalProcessResponse?.metadata
+                .loanSecurityType as LoanSecurityType) ||
+              ('' as LoanSecurityType),
+            loanCollateralTypes:
+              (lastValidHistory?.response.approvalProcessResponse?.metadata
+                .loanCollateralTypes as LoanCollateralType[]) ||
+              ('' as LoanCollateralType),
+            note:
+              lastValidHistory?.response.approvalProcessResponse?.metadata
+                .note || '',
+            metadata: {
+              key1: 'key1',
+              key2: 'key 2',
+            },
+          }));
+        }
       } catch (error) {
         console.error('Error fetching workflow:', error);
-      } finally {
-        setIsLoadingapi(false);
       }
     };
 
@@ -254,7 +262,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     if (!validateForm()) {
       return;
     }
-    console.log(fromScreen);
+
     try {
       setIsLoading(true);
 
@@ -270,7 +278,6 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           key2: '',
         },
       };
-      console.log('Loan data:', loanData, appId);
 
       if (_actionType === 'next') {
         const response = await loanRequest(appId, loanData);
@@ -280,10 +287,10 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           navigation.replace('CreateLoanPlan', {appId});
         }
       } else {
-        const response = await uploadLoanRequest(appId, loanData);
+        const response = await updateLoanRequest(appId, loanData);
         console.log('Loan request response:', response);
         if (response) {
-          //navigation.replace('InfoCreateLoan', {appId});
+          navigation.replace('InfoCreateLoan', {appId});
           navigation.goBack();
         }
       }
@@ -413,157 +420,166 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
   };
 
   return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{flexGrow: 1}}
-      contentInsetAdjustmentBehavior="automatic"
-      nestedScrollEnabled={true}
-      showsVerticalScrollIndicator={false}>
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Số tiền vay' : 'Loan Amount'}
-        </Text>
-        {/* Use the CurrencyInput component */}
-        <CurrencyInput
-          placeholder={
-            currentLanguage === 'vi' ? 'Nhập số tiền' : 'Enter amount'
-          }
-          value={formData.amount}
-          onChangeText={(value: number) => handleOnchange('amount', value)}
-        />
-        {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-      </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{flexGrow: 1}}
+        contentInsetAdjustmentBehavior="automatic"
+        nestedScrollEnabled={true}
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Số tiền vay' : 'Loan Amount'}
+          </Text>
+          {/* Use the CurrencyInput component */}
+          <CurrencyInput
+            placeholder={
+              currentLanguage === 'vi' ? 'Nhập số tiền' : 'Enter amount'
+            }
+            value={formData.amount}
+            onChangeText={(value: number) => handleOnchange('amount', value)}
+          />
+          {errors.amount && (
+            <Text style={styles.errorText}>{errors.amount}</Text>
+          )}
+        </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Mục đích vay' : 'Loan Purpose'}
-        </Text>
-        <InputBackground
-          placeholder={
-            currentLanguage === 'vi' ? 'Nhập mục đích' : 'Enter purpose'
-          }
-          onChangeText={(value: string) => handleOnchange('purpose', value)}
-          value={formData.purpose}
-        />
-        {errors.purpose && (
-          <Text style={styles.errorText}>{errors.purpose}</Text>
-        )}
-      </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Mục đích vay' : 'Loan Purpose'}
+          </Text>
+          <InputBackground
+            placeholder={
+              currentLanguage === 'vi' ? 'Nhập mục đích' : 'Enter purpose'
+            }
+            onChangeText={(value: string) => handleOnchange('purpose', value)}
+            value={formData.purpose}
+          />
+          {errors.purpose && (
+            <Text style={styles.errorText}>{errors.purpose}</Text>
+          )}
+        </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Loại người vay' : 'Borrower Type'}
-        </Text>
-        <DropdownComponent
-          value={formData.borrowerType}
-          data={borrowerTypes}
-          placeholder={currentLanguage === 'vi' ? 'Chọn loại' : 'Select type'}
-          onChange={(value: TargetItem) =>
-            handleOnchange('borrowerType', value.value as BorrowerType)
-          }
-        />
-      </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Loại người vay' : 'Borrower Type'}
+          </Text>
+          <DropdownComponent
+            value={formData.borrowerType}
+            data={borrowerTypes}
+            placeholder={currentLanguage === 'vi' ? 'Chọn loại' : 'Select type'}
+            onChange={(value: TargetItem) =>
+              handleOnchange('borrowerType', value.value as BorrowerType)
+            }
+          />
+        </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi'
-            ? 'Loại tài sản đảm bảo'
-            : 'Collateral Type'}
-        </Text>
-        <CustomMultiSelect
-          ref={multiSelectRef}
-          value={formData.loanCollateralTypes}
-          options={collateralTypes}
-          placeholder={
-            currentLanguage === 'vi'
-              ? 'Chọn loại tài sản'
-              : 'Select collateral types'
-          }
-          onChange={value => handleOnchange('loanCollateralTypes', value)}
-          onItemSelect={handleCollateralTypeChange}
-          isOpen={isOpen}
-          setIsOpen={setIsOpen}
-          theme={theme}
-        />
-        {errors.loanCollateralTypes && (
-          <Text style={styles.errorText}>{errors.loanCollateralTypes}</Text>
-        )}
-      </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi'
+              ? 'Loại tài sản đảm bảo'
+              : 'Collateral Type'}
+          </Text>
+          <CustomMultiSelect
+            ref={multiSelectRef}
+            value={formData.loanCollateralTypes}
+            options={collateralTypes}
+            placeholder={
+              currentLanguage === 'vi'
+                ? 'Chọn loại tài sản'
+                : 'Select collateral types'
+            }
+            onChange={value => handleOnchange('loanCollateralTypes', value)}
+            onItemSelect={handleCollateralTypeChange}
+            isOpen={isOpen}
+            setIsOpen={setIsOpen}
+            theme={theme}
+          />
+          {errors.loanCollateralTypes && (
+            <Text style={styles.errorText}>{errors.loanCollateralTypes}</Text>
+          )}
+        </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Hình thức bảo đảm' : 'Security Type'}
-        </Text>
-        <DropdownComponent
-          value={formData.loanSecurityType}
-          data={securityTypes}
-          placeholder={
-            currentLanguage === 'vi' ? 'Chọn hình thức' : 'Select type'
-          }
-          onChange={(value: TargetItem) =>
-            handleOnchange('loanSecurityType', value.value as LoanSecurityType)
-          }
-        />
-      </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Hình thức bảo đảm' : 'Security Type'}
+          </Text>
+          <DropdownComponent
+            value={formData.loanSecurityType}
+            data={securityTypes}
+            placeholder={
+              currentLanguage === 'vi' ? 'Chọn hình thức' : 'Select type'
+            }
+            onChange={(value: TargetItem) =>
+              handleOnchange(
+                'loanSecurityType',
+                value.value as LoanSecurityType,
+              )
+            }
+          />
+        </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Ghi chú' : 'Note'}
-        </Text>
-        <InputBackground
-          placeholder={currentLanguage === 'vi' ? 'Nhập ghi chú' : 'Enter note'}
-          onChangeText={(value: string) => handleOnchange('note', value)}
-          value={formData.note}
-        />
-        {errors.note && <Text style={styles.errorText}>{errors.note}</Text>}
-      </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Ghi chú' : 'Note'}
+          </Text>
+          <InputBackground
+            placeholder={
+              currentLanguage === 'vi' ? 'Nhập ghi chú' : 'Enter note'
+            }
+            onChangeText={(value: string) => handleOnchange('note', value)}
+            value={formData.note}
+          />
+          {errors.note && <Text style={styles.errorText}>{errors.note}</Text>}
+        </View>
 
-      <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-        {fromScreen === 'InfoCreateLoan' ? (
-          <TouchableOpacity
-            style={[
-              styles.btn,
-              isLoading && {opacity: 0.7},
-              {flex: 1, marginRight: 8},
-            ]}
-            onPress={() => handleSubmit('update')}
-            disabled={isLoading}>
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text
-                style={[
-                  styles.textWhite,
-                  {fontWeight: 'bold', textAlign: 'center'},
-                ]}>
-                {currentLanguage === 'vi' ? 'Cập nhật' : 'Update'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[
-              styles.btn,
-              isLoading && {opacity: 0.7},
-              {flex: 1, marginLeft: 8},
-            ]}
-            onPress={() => handleSubmit('next')}
-            disabled={isLoading}>
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text
-                style={[
-                  styles.textWhite,
-                  {fontWeight: 'bold', textAlign: 'center'},
-                ]}>
-                {t('formCreateLoan.next')}
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-    </ScrollView>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+          {fromScreen === 'InfoCreateLoan' ? (
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                isLoading && {opacity: 0.7},
+                {flex: 1, marginRight: 8},
+              ]}
+              onPress={() => handleSubmit('update')}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text
+                  style={[
+                    styles.textWhite,
+                    {fontWeight: 'bold', textAlign: 'center'},
+                  ]}>
+                  {currentLanguage === 'vi' ? 'Cập nhật' : 'Update'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                isLoading && {opacity: 0.7},
+                {flex: 1, marginLeft: 8},
+              ]}
+              onPress={() => handleSubmit('next')}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text
+                  style={[
+                    styles.textWhite,
+                    {fontWeight: 'bold', textAlign: 'center'},
+                  ]}>
+                  {t('formCreateLoan.next')}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
+    </TouchableWithoutFeedback>
   );
 };
 

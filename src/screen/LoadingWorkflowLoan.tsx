@@ -118,19 +118,34 @@ const LoadingWorkflowLoan: React.FC<LoadingWorkflowLoanProps> = ({
         });
         break;
       case 'CreateLoanPlan':
-        navigation.replace('CreateLoanPlan', {appId});
+        navigation.replace('CreateLoanPlan', {
+          appId,
+          fromScreen: 'LoadingWorkflowLoan',
+        });
         break;
       case 'CreateFinancialInfo':
-        navigation.replace('CreateFinancialInfo', {appId});
+        navigation.replace('CreateFinancialInfo', {
+          appId,
+          fromScreen: 'LoadingWorkflowLoan',
+        });
         break;
       case 'CreditRating':
-        navigation.replace('CreditRating', {appId});
+        navigation.replace('CreditRating', {
+          appId,
+          fromScreen: 'LoadingWorkflowLoan',
+        });
         break;
       case 'AssetCollateral':
-        navigation.replace('AssetCollateral', {appId});
+        navigation.replace('AssetCollateral', {
+          appId,
+          fromScreen: 'LoadingWorkflowLoan',
+        });
         break;
       case 'InfoCreateLoan':
-        navigation.replace('InfoCreateLoan', {appId});
+        navigation.replace('InfoCreateLoan', {
+          appId,
+          fromScreen: 'LoadingWorkflowLoan',
+        });
         break;
     }
   };

@@ -32,8 +32,12 @@ const CreateLoanRequest: React.FC<CreateLoanRequestProps> = ({
   navigation,
   route,
 }) => {
+  type RouteParams = {
+    appId: string;
+    fromScreen?: string; // Thêm thuộc tính này
+  };
   const {theme} = useTheme();
-  const {appId, fromScreen} = route.params;
+  const {appId, fromScreen} = route.params as RouteParams;
 
   const styles = StyleSheet.create({
     view: {
@@ -55,7 +59,7 @@ const CreateLoanRequest: React.FC<CreateLoanRequestProps> = ({
         <Header Navbar="CreateLoanRequest" navigation={navigation} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 300 : 0}
           style={{flex: 1}}>
           <View style={styles.body}>
             <FormCreateLoanRequest

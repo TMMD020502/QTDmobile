@@ -15,7 +15,14 @@ import {CreditRatingRequest, CreditRatingResponse} from '../types/creditRating';
 import {
   saveAccessApprovalProcessId,
   getAccessApprovalProcessId,
+  saveLoanPlanApprovalProcessId,
+  getLoanPlanApprovalProcessId,
+  saveFinancialInfoApprovalProcessId,
+  getFinancialInfoApprovalProcessId,
+  getDocumentIds,
 } from '../../../tokenStorage';
+import {UploadResponse} from '../types/upload';
+import {DocumentPickerResponse} from 'react-native-document-picker';
 //Init Application
 export const initLoan = async (
   params: UserInit,
@@ -48,7 +55,7 @@ export const loanRequest = async (
       id: applicationId,
     },
   };
-
+  console.log('APPLICATIONID' + applicationId);
   const response = await axiosInstance.post(
     `/loan-requests?applicationId=${applicationId}`,
     requestBody,
@@ -59,20 +66,21 @@ export const loanRequest = async (
   return response.data;
 };
 
-export const uploadLoanRequest = async (
+export const updateLoanRequest = async (
   applicationId: string,
   loanData: Omit<LoanRequest, 'application'>, // Không cần applicationId
 ): Promise<LoanWorkflowResponseS> => {
   // Loại bỏ asset trước khi tạo requestBody
-  const filteredLoanData = {...loanData};
-  delete (filteredLoanData as any).asset;
+  //const filteredLoanData = {...loanData};
+  //delete (filteredLoanData as any).asset;
   const requestBody: LoanRequest = {
-    ...filteredLoanData,
+    //...filteredLoanData,
+    ...loanData,
     application: {
       id: applicationId,
     },
   };
-
+  console.log('APPLICATIONID' + applicationId);
   const loanRequestApprovalProcessId = await getAccessApprovalProcessId();
 
   console.log('test1', loanRequestApprovalProcessId);
@@ -112,10 +120,11 @@ export const getworkflowbyapplicationid = async (
 ): Promise<LoanWorkflowResponseS> => {
   // Loại bỏ asset trước khi tạo requestBody
   try {
+    console.log('APPLICATIONID' + applicationId);
     const response = await axiosInstance.get(
       `/onboarding-workflows/${applicationId}`,
     );
-    console.log('API Response:', response.data.result);
+    console.log('API Response:', response.data);
     return response.data;
   } catch (error: any) {
     if (error.response) {
@@ -154,9 +163,29 @@ export const loanPlan = async (
     `/loan-plans?applicationId=${applicationId}`,
     requestBody,
   );
+  await saveLoanPlanApprovalProcessId(response.data.result.id);
+  console.log(await getLoanPlanApprovalProcessId());
   return response.data;
 };
-
+//Update_loan_plan
+export const updateLoanPlan = async (
+  applicationId: string,
+  loanPlanData: Omit<CreateLoanPlanRequest, 'application'>,
+): Promise<LoanPlanResponse> => {
+  const requestBody: CreateLoanPlanRequest = {
+    ...loanPlanData,
+    application: {
+      id: applicationId,
+    },
+  };
+  console.log('APPLICATIONID' + applicationId);
+  const LoanPlanApprovalProcessId = await getLoanPlanApprovalProcessId();
+  const response = await axiosInstance.put(
+    `/loan-plans/${LoanPlanApprovalProcessId}`,
+    requestBody,
+  );
+  return response.data;
+};
 //Create-financial-info
 export const financialInfo = async (
   applicationId: string,
@@ -168,12 +197,64 @@ export const financialInfo = async (
       id: applicationId,
     },
   };
-
+  console.log('APPLICATIONID' + applicationId);
+  console.log('Filtered JSON:', JSON.stringify(requestBody, null, 2));
   const response = await axiosInstance.post(
     `/financial-infos?applicationId=${applicationId}`,
     requestBody,
   );
+  await saveFinancialInfoApprovalProcessId(response.data.result.id);
   return response.data;
+};
+export const updateFinancialInfo = async (
+  applicationId: string,
+  loanPlanData: Omit<CreateFinancialInfoRequest, 'application'>,
+): Promise<LoanPlanResponse> => {
+  const requestBody: CreateFinancialInfoRequest = {
+    ...loanPlanData,
+    application: {
+      id: applicationId,
+    },
+  };
+  console.log('APPLICATIONID' + applicationId);
+  const financialinfoApprovalProcessId =
+    await getFinancialInfoApprovalProcessId();
+
+  const response = await axiosInstance.put(
+    `/financial-infos/${financialinfoApprovalProcessId}`,
+    requestBody,
+  );
+  return response.data;
+};
+
+export const getDocuments = async (): Promise<DocumentPickerResponse> => {
+  // Loại bỏ asset trước khi tạo requestBody
+  try {
+    const documentIds = await getDocumentIds();
+    console.log('Documenid' + documentIds);
+    const response = await axiosInstance.get(`/documents/${documentIds}`);
+    console.log('API Response documen:', response.data);
+    return response.data.result;
+  } catch (error: any) {
+    if (error.response) {
+      // Lỗi từ phía server (4xx, 5xx)
+      console.error(
+        'Lỗi từ server:',
+        error.response.status,
+        error.response.data,
+      );
+      // Trả về một giá trị mặc định thay vì undefined
+      return error.response.data;
+    }
+  }
+  return {
+    code: 'ERROR',
+    message: 'Lỗi kết nối hoặc lỗi không xác định',
+    result: {
+      id: '',
+      status: 'failed',
+    },
+  } as unknown as DocumentPickerResponse;
 };
 
 //add assets

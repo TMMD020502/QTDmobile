@@ -1,3 +1,8 @@
+interface FileData {
+  uri: string;
+  name: string | null;
+  type: string;
+}
 export interface CreateFinancialInfoRequest {
   jobTitle: string;
   companyName: string;
@@ -15,6 +20,7 @@ export interface CreateFinancialInfoRequest {
 }
 
 export interface FinancialInfoResponse {
+  code: number;
   success: boolean;
   message: string;
 }

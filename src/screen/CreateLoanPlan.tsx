@@ -12,6 +12,7 @@ import {useTheme} from '../context/ThemeContext';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../navigators/RootNavigator';
 import {RouteProp} from '@react-navigation/native';
+import i18n from '../../i18n';
 
 type CreateLoanPlanNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -26,9 +27,12 @@ interface CreateLoanPlanProps {
 }
 
 const CreateLoanPlan: React.FC<CreateLoanPlanProps> = ({navigation, route}) => {
+  type RouteParams = {
+    appId: string;
+    fromScreen?: string; // Thêm thuộc tính này
+  };
   const {theme} = useTheme();
-  const {appId} = route.params;
-
+  const {appId, fromScreen} = route.params as RouteParams;
   const styles = StyleSheet.create({
     view: {
       flex: 1,
