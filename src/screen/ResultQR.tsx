@@ -241,7 +241,7 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
       frontImage: 'https://via.placeholder.com/150',
       backImage: 'https://via.placeholder.com/150',
     };
-    }, [qrData, formDataUser, formDataAddress, splitName]);
+  }, [qrData, formDataUser, formDataAddress, splitName]);
   // }, []);
 
   // Update Alert messages to use translations
@@ -392,7 +392,7 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
 
             // Update image picker error handling
             const selectImage = async (
-              type: 'signature' | 'front' | 'back',
+              type: 'signature' | 'CCCD_FRONT' | 'CCCD_BACK',
             ) => {
               const options: ImageLibraryOptions = {
                 mediaType: 'photo' as MediaType,
@@ -430,6 +430,7 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
                       uri: image.uri,
                       type: image.type || '',
                       fileName: image.fileName || '',
+                      typeapi: type,
                     });
                     const imageUrl = uploadResult.url; // Adjust based on your API response
 
@@ -440,11 +441,11 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
                         setSignatureImage({...image, uri: imageUrl});
                         setFieldValue('signatureImage', imageUrl);
                         break;
-                      case 'front':
+                      case 'CCCD_FRONT':
                         setFrontImage({...image, uri: imageUrl});
                         setFieldValue('frontImage', imageUrl);
                         break;
-                      case 'back':
+                      case 'CCCD_BACK':
                         setBackImage({...image, uri: imageUrl});
                         setFieldValue('backImage', imageUrl);
                         break;
@@ -534,7 +535,7 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
                     title={t('register.resultScreen.frontImage')}
                     theme={theme}
                     typeImage={frontImage}
-                    onSelectImage={() => selectImage('front')}
+                    onSelectImage={() => selectImage('CCCD_FRONT')}
                     touched={touched?.frontImage}
                     errors={errors?.frontImage}
                   />
@@ -543,7 +544,7 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
                     title={t('register.resultScreen.backImage')}
                     theme={theme}
                     typeImage={backImage}
-                    onSelectImage={() => selectImage('back')}
+                    onSelectImage={() => selectImage('CCCD_BACK')}
                     touched={touched?.backImage}
                     errors={errors?.backImage}
                   />

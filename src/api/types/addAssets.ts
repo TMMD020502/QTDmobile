@@ -26,12 +26,25 @@ interface OwnerInfo {
   fullName: string;
   dayOfBirth: string;
   idCardNumber: string;
+  idIssueDate: string;
+  idIssuePlace: string;
   permanentAddress: string;
 }
-
+interface TransferInfo {
+  fullName: string;
+  dayOfBirth: string;
+  idCardNumber: string;
+  idIssueDate: string;
+  idIssuePlace: string;
+  permanentAddress: string;
+  transferDate: string;
+  transferRecordNumber: string;
+}
 // Apartment Asset
 export interface ApartmentAsset extends BaseAsset {
   assetType: 'APARTMENT';
+  ownerInfo: OwnerInfo;
+  transferInfo: TransferInfo;
   apartment: {
     plotNumber: string;
     mapNumber: string;
@@ -57,21 +70,14 @@ export interface ApartmentAsset extends BaseAsset {
       view: string;
       renovationStatus: string;
     };
-    ownerInfo: OwnerInfo;
-    transferInfo: {
-      fullName: string;
-      dayOfBirth: string;
-      idCardNumber: string;
-      permanentAddress: string;
-      transferDate: string;
-      transferRecordNumber: string;
-    };
   };
 }
 
 // Land Asset
 export interface LandAsset extends BaseAsset {
   assetType: 'LAND';
+  ownerInfo: OwnerInfo;
+  transferInfo: TransferInfo;
   landAsset: {
     plotNumber: string;
     mapNumber: string;
@@ -80,15 +86,6 @@ export interface LandAsset extends BaseAsset {
     purpose: string;
     expirationDate: string;
     originOfUsage: string;
-    ownerInfo: OwnerInfo;
-    transferInfo: {
-      fullName: string;
-      dayOfBirth: string;
-      idCardNumber: string;
-      permanentAddress: string;
-      transferDate: string;
-      transferRecordNumber: string;
-    };
     metadata: {
       zoning: string;
       frontage: string;
@@ -215,14 +212,7 @@ export interface LandAndImprovementAsset extends BaseAsset {
       idCardNumber: string;
       permanentAddress: string;
     };
-    transferInfo: {
-      fullName: string;
-      dayOfBirth: string;
-      idCardNumber: string;
-      permanentAddress: string;
-      transferDate: string;
-      transferRecordNumber: string;
-    };
+    transferInfo: TransferInfo;
     metadata: {
       constructionPermit: string;
       lastRenovation: string;

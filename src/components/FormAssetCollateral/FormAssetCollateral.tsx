@@ -17,6 +17,8 @@ import FormLandAndImprove from './FormLandAndImprove';
 export interface FormAssetCollateralProps {
   theme: Theme;
   appId: string;
+  status?: string;
+  fromScreen?: string;
   navigation: StackNavigationProp<RootStackParamList>;
 }
 
@@ -24,6 +26,8 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
   theme,
   appId,
   navigation,
+  fromScreen,
+  status,
 }) => {
   const [assetType, setAssetType] = useState<AssetType | null>('VEHICLE');
   const [isLoading, setIsLoading] = useState(true);
@@ -71,13 +75,21 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
     switch (assetType) {
       case 'LAND':
         return (
-          <FormLandFields theme={theme} appId={appId} navigation={navigation} />
+          <FormLandFields
+            theme={theme}
+            appId={appId}
+            navigation={navigation}
+            status={status}
+            fromScreen={fromScreen}
+          />
         );
       case 'APARTMENT':
         return (
           <FormApartmentFields
             theme={theme}
             appId={appId}
+            status={status}
+            fromScreen={fromScreen}
             navigation={navigation}
           />
         );
@@ -86,6 +98,8 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
           <FormVehicleFields
             theme={theme}
             appId={appId}
+            status={status}
+            fromScreen={fromScreen}
             navigation={navigation}
           />
         );
@@ -94,6 +108,8 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
           <FormMachineryFields
             theme={theme}
             appId={appId}
+            status={status}
+            fromScreen={fromScreen}
             navigation={navigation}
           />
         );
@@ -102,6 +118,8 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
           <FormMarketStallsFields
             theme={theme}
             appId={appId}
+            status={status}
+            fromScreen={fromScreen}
             navigation={navigation}
           />
         );
@@ -110,6 +128,8 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
           <FormLandAndImprove
             theme={theme}
             appId={appId}
+            status={status}
+            fromScreen={fromScreen}
             navigation={navigation}
           />
         );
@@ -118,6 +138,8 @@ const FormAssetCollateral: React.FC<FormAssetCollateralProps> = ({
           <FormOthersFields
             theme={theme}
             appId={appId}
+            status={status}
+            fromScreen={fromScreen}
             onSuccess={onSuccess}
             navigation={navigation}
           />

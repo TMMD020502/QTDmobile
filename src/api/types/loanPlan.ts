@@ -1,4 +1,7 @@
 export type LoanTermOptiontype = 12 | 24 | 36;
+export type BorrowerType = 'INDIVIDUAL' | 'ORGANIZATION';
+export type LoanSecurityType = 'MORTGAGE' | 'UNSECURED' | 'PLEDGE' | 'NONE';
+export type LoanCollateralType = 'VEHICLE' | 'LAND' | 'APARTMENT' | 'OTHER';
 export interface LoanPlanMetadata {
   [key: string]: string | number | boolean;
 }
@@ -8,11 +11,14 @@ export interface LoanPlanApplication {
 }
 
 export interface CreateLoanPlanRequest {
-  totalCapitalRequirement: number;
-  ownCapital: number;
-  proposedLoanAmount: number;
+  purpose: string;
+  amount: number;
+  borrowerType: BorrowerType;
+  loanSecurityType: LoanSecurityType;
+  loanCollateralTypes: LoanCollateralType[];
   monthlyIncome: number;
-  repaymentPlan: string;
+  repaymentMethod: string;
+  interestType: string;
   note: string;
   loanTerm: LoanTermOptiontype;
   interestRate: number | undefined;

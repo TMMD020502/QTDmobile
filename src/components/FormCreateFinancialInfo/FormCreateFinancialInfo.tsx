@@ -10,6 +10,7 @@ import {
   Image,
   TouchableWithoutFeedback,
   Keyboard,
+  Modal,
 } from 'react-native';
 import React, {useEffect, useState, useRef} from 'react';
 import InputBackground from '../InputBackground/InputBackground';
@@ -18,7 +19,6 @@ import {useTranslation} from 'react-i18next';
 import {Theme} from '../../theme/colors';
 import {
   financialInfo,
-  getDocuments,
   getworkflowbyapplicationid,
   updateFinancialInfo,
 } from '../../api/services/loan';
@@ -31,20 +31,27 @@ import {AppIcons} from '../../icons';
 import {Formik, FormikProps} from 'formik';
 import * as Yup from 'yup';
 import i18n from '../../../i18n';
-import {uploadImage} from '../../api/services/uploadImage';
+import {
+  getDocuments,
+  uploadImage,
+} from '../../api/services/uploadImage';
 import {useRoute} from '@react-navigation/native';
-import {LoanResponse} from '../../api/types/loanworkflowtypes';
-import {getDocumentIds, saveDocumentIds} from '../../../tokenStorage';
+import {CreateFinancialInfo} from '../../api/types/loanworkflowtypes';
+import {
+  clearFinanciaDocumentIds,
+  getFinanciaDocumentIds,
+  saveFinanciaDocumentIds,
+} from '../../../tokenStorage';
+import FileViewer from 'react-native-file-viewer';
+import {UploadResponse} from '../../api/types/upload';
+import ImageDisplay from '../ImageDisplay/ImageDisplay';
+
 interface FormCreateFinancialInfoProps {
   theme: Theme;
   navigation: StackNavigationProp<RootStackParamList, 'CreateFinancialInfo'>;
   appId: string;
   fromScreen?: string;
-}
-
-interface FileData {
-  uri: string;
-  type: string;
+  status?: string;
 }
 
 interface FormData {
@@ -60,15 +67,18 @@ interface FormData {
   files: string[];
   actionType: string;
 }
-
+interface ExtendedDocumentPickerResponse extends DocumentPickerResponse {
+  source: 'local' | 'server';
+}
 const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
   theme,
   navigation,
 }) => {
   const route = useRoute();
-  const {appId, fromScreen} = route.params as {
+  const {appId, fromScreen, status} = route.params as {
     appId: string;
     fromScreen?: string;
+    status?: string;
   };
   const {t} = useTranslation();
   const formikRef = useRef<FormikProps<FormData>>(null); // Create a ref for Formik
@@ -86,62 +96,73 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     files: [],
     actionType: '',
   });
+  const [showImage, setShowImage] = useState(false); // Trạng thái hiển thị Modal
+  const [selectedFileUri, setSelectedFileUri] = useState<string | null>(null); // URL của file cần hiển thị
+
+  const handleFilePress = (file: ExtendedDocumentPickerResponse) => {
+    if (file.source === 'local') {
+      handleViewFile(file.uri); // Mở file từ thiết bị
+    } else if (file.source === 'server') {
+      setSelectedFileUri(file.uri); // Lưu URL của file từ server
+      setShowImage(true); // Hiển thị Modal
+    }
+  };
   // const [formDataFile, setFormDataFile] = useState<FileData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<DocumentPickerResponse[]>(
-    [],
-  );
-
+  const [selectedFiles, setSelectedFiles] = useState<
+    ExtendedDocumentPickerResponse[]
+  >([]);
   console.log('selectedFiles:', formData);
   // const [savedFile, setSavedFile] = useState(null);
-
-  const handleDocumentPick = async () => {
+  const handleViewFile = async (fileUri: string) => {
     try {
-      const res = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles], // Chọn loại tệp bạn muốn cho phép
-      });
-      const File = res[0];
+      // Thử mở file với URI ban đầu
+      await FileViewer.open(fileUri);
+    } catch (error) {
+      console.error('Error opening file with original URI:', error);
+    }
+  };
+  
+  const handleDocumentPick = async () => {
+    const res = await DocumentPicker.pick({
+      type: [DocumentPicker.types.allFiles], // Chọn loại tệp bạn muốn cho phép
+    });
+    console.log('Selected file1:', res[0]);
+    const File: ExtendedDocumentPickerResponse = {
+      ...res[0],
+      source: 'local', // Đánh dấu file từ thiết bị
+    };
+    /*
+      const fileUri =
+        Platform.OS === 'android' && !res[0].uri.startsWith('file://')
+          ? `file://${res[0].uri}`
+          : res[0].uri;*/
+    const file = {
+      uri: res[0].uri,
+      type: res[0].type || 'application/octet-stream',
+      fileName: res[0].name || '',
+      source: 'local',
+      typeapi: 'FINANCIAL_INFO',
+    };
+    console.log('Formdata:' + JSON.stringify(file));
+    const uploadResponse = await uploadImage(file);
 
-      const file = {
-        uri: res[0].uri,
-        type: res[0].type || 'application/octet-stream',
-        fileName: res[0].name || '',
-      };
-      const uploadResponse = await uploadImage(file);
-      if (uploadResponse) {
-        // 🎯 Hiển thị đầy đủ thông tin phản hồi
-        console.log('✅ Response:', uploadResponse);
-        console.log('📌 Id:', uploadResponse.id);
+    if (uploadResponse) {
+      // 🎯 Hiển thị đầy đủ thông tin phản hồi
+      console.log('✅ Response:', uploadResponse);
+      console.log('📌 Id:', uploadResponse.id);
 
-        setSelectedFiles(prev => [...prev, File]);
-        await saveDocumentIds([uploadResponse.id ?? '']);
-        formikRef.current?.setFieldValue('files', [
-          ...(formikRef.current?.values.files || []),
-          uploadResponse.id,
-        ]);
-      }
-    } catch (err: any) {
-      if (DocumentPicker.isCancel(err)) {
-        // Xử lý hủy chọn tệp
+      setSelectedFiles(prev => [...prev, File]);
+      // Lấy danh sách id hiện tại từ AsyncStorage
+      const existingIds = (await getFinanciaDocumentIds()) || [];
 
-        console.log('User cancelled document picker');
-      } else {
-        // Xử lý lỗi khác
-        if (err.response.status === 413) {
-          Alert.alert(
-            currentLanguage === 'vi'
-              ? '🔴 File có dung lượng quá lớn.'
-              : '🔴 The file is too large.',
-          );
-        }
-        if (err.response) {
-          console.error('🔴 Lỗi từ server:', err.response.data);
-          console.error('📌 Status:', err.response.status);
-          console.error('📌 Headers:', err.response.headers);
-        } else {
-          console.error('❌ Không có phản hồi từ server hoặc lỗi mạng.');
-        }
-      }
+      // Thêm id mới vào danh sách
+      const updatedIds = [...existingIds, uploadResponse.id ?? ''];
+      await saveFinanciaDocumentIds(updatedIds);
+      formikRef.current?.setFieldValue('files', [
+        ...(formikRef.current?.values.files || []),
+        uploadResponse.id,
+      ]);
     }
   };
 
@@ -151,18 +172,21 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       'files',
       formikRef.current?.values.files.filter((_, i) => i !== index),
     );
+    clearFinanciaDocumentIds();
   };
 
-  const handleSubmit = async (values: FormData, actionType: string) => {
+  const handleSubmit = async (values: FormData, _actionType: string) => {
     try {
       setIsLoading(true);
-      const {actionType: _, ...filteredValues} = values;
+
+      const {actionType, ...filteredValues} = values;
       if (actionType === 'next') {
+        /*
         if ((formikRef.current?.values.files || []).length === 0) {
           Alert.alert('Lỗi', 'Vui lòng chọn ít nhất một file.');
           return;
         }
-
+*/
         console.log('Files before API call:', formikRef.current?.values);
         console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
         const response = await financialInfo(appId, filteredValues);
@@ -170,6 +194,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
           navigation.replace('LoadingWorkflowLoan', {appId});
         }
       } else if (actionType === 'update') {
+        console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
         const response = await updateFinancialInfo(appId, filteredValues);
         if (response.code === 200) {
           navigation.goBack();
@@ -303,6 +328,39 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       fontSize: 12,
       marginTop: 8,
     },
+    webViewContainer: {
+      flex: 1,
+    },
+    closeButton: {
+      position: 'absolute', // Đặt vị trí tuyệt đối
+      top: 10, // Cách mép trên 10px
+      right: 10, // Cách mép phải 10px
+      backgroundColor: 'rgba(255, 68, 68, 0.8)', // Nền đỏ mờ
+      padding: 8, // Đệm bên trong nút
+      borderRadius: 20, // Bo tròn nút
+      zIndex: 10, // Đảm bảo nút nằm trên hình ảnh
+    },
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)', // Nền mờ
+    },
+    modalContent: {
+      position: 'absolute', // Đặt vị trí tuyệt đối
+      top: '10%', // Đẩy nội dung lên cao hơn (10% từ trên màn hình)
+      backgroundColor: 'transparent', // Làm nền trong suốt
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '90%', // Chiều rộng 90% màn hình
+      maxHeight: '80%', // Chiều cao tối đa 80% màn hình
+    },
+    closeButtonIcon: {
+      width: 16, // Kích thước icon
+      height: 16,
+      tintColor: 'white', // Màu icon
+    },
+    //backgroundColor: 'rgba(255, 255, 255, 0)', // Làm trong suốt nền backgroundColor: 'transparent',
   });
 
   // Format file size
@@ -337,15 +395,13 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     monthlyLoanPayment: Yup.number()
       .min(1000000, t('formCreateLoan.errors.invalidAmount'))
       .required(t('formCreateLoan.errors.missingFields')),
-    files: Yup.array()
-      .of(Yup.string())
-      .min(1, t('formCreateLoan.errors.missingFiles')) // hoặc t('Vui lòng tải lên ít nhất 1 tài liệu')
-      .required(t('formCreateLoan.errors.missingFiles')),
+    files: Yup.array().of(Yup.string()),
   });
   useEffect(() => {
     const fetchData = async () => {
+      
       try {
-        const data = await getworkflowbyapplicationid(appId);
+        const data = await getworkflowbyapplicationid<CreateFinancialInfo>(appId);
         if (data.result) {
           const createLoanStep = data.result.steps.find(
             step => step.name === 'create-financial-info',
@@ -358,16 +414,16 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
               lastValidHistory?.response.approvalProcessResponse?.metadata;
 
             if (financialData) {
-              const mapLoanToFormData = (loan: LoanResponse): FormData => ({
-                jobTitle: financialData?.jobTitle || '',
-                companyName: financialData?.companyName || '',
-                companyAddress: financialData?.companyAddress || '',
-                hasMarried: financialData?.hasMarried || false,
-                totalIncome: financialData?.totalIncome || 0,
-                monthlyExpense: financialData?.monthlyExpense || 0,
-                monthlySaving: financialData?.monthlySaving || 0,
-                monthlyDebt: financialData?.monthlyDebt || 0,
-                monthlyLoanPayment: financialData?.monthlyLoanPayment || 0,
+              const mapLoanToFormData = (financialData: CreateFinancialInfo[]): FormData => ({
+                jobTitle: financialData[0]?.jobTitle || '',
+                companyName: financialData[0]?.companyName || '',
+                companyAddress: financialData[0]?.companyAddress || '',
+                hasMarried: financialData[0]?.hasMarried || false,
+                totalIncome: financialData[0]?.totalIncome || 0,
+                monthlyExpense: financialData[0]?.monthlyExpense || 0,
+                monthlySaving: financialData[0]?.monthlySaving || 0,
+                monthlyDebt: financialData[0]?.monthlyDebt || 0,
+                monthlyLoanPayment: financialData[0]?.monthlyLoanPayment || 0,
                 files: [],
                 actionType: '',
               });
@@ -385,13 +441,29 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
             }
           }
         }
+        // Gọi API getDocuments
+        const documents = await getDocuments();
+        console.log('Documents from API:', documents);
+        if (documents && documents.length > 0) {
+          const formattedFiles: ExtendedDocumentPickerResponse[] =
+            documents.map((doc: UploadResponse) => ({
+              uri: doc.result.url || '', // Đường dẫn đến file
+              type: doc.result.type || 'application/octet-stream',
+              name: doc.result.title || 'Unknown File',
+              fileCopyUri: null, // Default value for fileCopyUri
+              size: 0, // Default value for size
+              source: 'server', // Đánh dấu file từ server
+            }));
+
+          setSelectedFiles(formattedFiles);
+        }
       } catch (error) {
         console.error('Error fetching workflow:', error);
       }
     };
 
     fetchData();
-  }, [appId]);
+  }, [appId, status]);
 
   return (
     <Formik
@@ -599,39 +671,69 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
                         {t('formCreateLoan.financialInfo.uploadDocument')}
                       </Text>
                     </TouchableOpacity>
-
-                    <View style={styles.filesList}>
-                      {selectedFiles.map((file, index) => (
-                        <View key={index} style={styles.fileItemContainer}>
-                          <View style={styles.fileContent}>
-                            <Image
-                              source={AppIcons.infoIcon}
-                              style={styles.fileIcon}
-                            />
-                            <Text style={styles.fileName} numberOfLines={1}>
-                              {file.name}
-                            </Text>
-                            <Text style={styles.fileSize}>
-                              {formatFileSize(file.size || 0)}
-                            </Text>
+                    <View>
+                      <View style={styles.filesList}>
+                        {selectedFiles.map((file, index) => (
+                          <View key={index} style={styles.fileItemContainer}>
+                            <TouchableOpacity
+                              style={styles.fileContent}
+                              onPress={() => handleFilePress(file)}>
+                              <Image
+                                source={AppIcons.infoIcon}
+                                style={styles.fileIcon}
+                              />
+                              <Text style={styles.fileName} numberOfLines={1}>
+                                {file.name ? file.name : 'Unknown File'}
+                              </Text>
+                              <Text style={styles.fileSize}>
+                                {file.size ? formatFileSize(file.size) : '0 B'}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.removeButton}
+                              onPress={() => handleRemoveFile(index)}>
+                              <Image
+                                source={AppIcons.closeIcon}
+                                style={styles.removeIcon}
+                              />
+                            </TouchableOpacity>
                           </View>
-                          <TouchableOpacity
-                            style={styles.removeButton}
-                            onPress={() => handleRemoveFile(index)}>
-                            <Image
-                              source={AppIcons.closeIcon}
-                              style={styles.removeIcon}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
+                        ))}
+                      </View>
+
+                      {/* Modal hiển thị hình ảnh */}
+                      {showImage && selectedFileUri && (
+                        <Modal
+                          visible={showImage}
+                          transparent={true} // Đảm bảo Modal có nền trong suốt
+                          onRequestClose={() => setShowImage(false)}>
+                          <View style={styles.modalContainer}>
+                            {/* Nút đóng */}
+                            <TouchableOpacity
+                              style={styles.closeButton}
+                              onPress={() => setShowImage(false)}>
+                              <Image
+                                source={AppIcons.closeIcon}
+                                style={styles.closeButtonIcon}
+                              />
+                            </TouchableOpacity>
+
+                            {/* Nội dung Modal */}
+                            <View style={styles.modalContent}>
+                              <ImageDisplay fileUri={selectedFileUri} />
+                            </View>
+                          </View>
+                        </Modal>
+                      )}
                     </View>
                   </View>
                 </View>
-                {fromScreen === 'InfoCreateLoan' ? (
+                {status === 'completed' ? null : fromScreen ===
+                  'InfoCreateLoan' ? (
                   <TouchableOpacity
                     style={[styles.btn, isLoading && {opacity: 0.7}]}
                     onPress={async () => {
+                      console.log('Button pressed');
                       setFieldValue('actionType', 'update');
                       formikHandleSubmit();
                     }}
@@ -652,7 +754,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
                   <TouchableOpacity
                     style={[styles.btn, isLoading && {opacity: 0.7}]}
                     onPress={() => {
-                      console.log('Button pressed');
                       setFieldValue('actionType', 'next');
                       formikHandleSubmit();
                     }}

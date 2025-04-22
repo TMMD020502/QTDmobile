@@ -2,11 +2,19 @@ export interface UploadFile {
   uri: string | undefined;
   type: string;
   fileName: string;
+  typeapi: string;
 }
 
-export interface UploadResponse {
+export interface UploadRequest {
   url: string;
   id?: string;
+  title?: string;
+  type?: string;
+}
+export interface UploadResponse {
+  code: number;
+  message: string;
+  result: UploadRequest;
 }
 
 export enum UploadErrorCode {

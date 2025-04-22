@@ -60,7 +60,7 @@ class AuthService {
       await this.handleAuthResponse(response.data);
       return true;
     } catch (error: any) {
-      console.log('Login error:', error.response);
+      console.error('Login error:', JSON.stringify(error.response));
       // Re-throw để component xử lý error
       throw error;
     }
@@ -87,7 +87,7 @@ class AuthService {
       await clearTokens();
       this.logoutCallback?.();
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('Logout failed:', JSON.stringify(error));
     }
   }
 
@@ -117,8 +117,8 @@ class AuthService {
 
       return false;
     } catch (error: any) {
-      console.log('Error:', error.message);
-      console.log('Error:', error.response);
+      console.error('Error:', JSON.stringify(error.message));
+      console.error('Error:', JSON.stringify(error.response));
     }
   }
 
@@ -164,7 +164,7 @@ class AuthService {
         '0',
       )}T00:00:00Z`;
     } catch (error) {
-      console.error('Date conversion error:', error);
+      console.error('Date conversion error:', JSON.stringify(error));
       return dateStr;
     }
   }

@@ -33,7 +33,7 @@ const axiosInstance: AxiosInstance = axios.create({
   baseURL: 'https://tsoftware.store/api/v1',
   timeout: 10000, // Tăng timeout lên 10s
   headers: {
-    'Content-Type': 'application/json',
+    // 'Content-Type': 'application/json',
   },
 });
 

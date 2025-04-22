@@ -273,6 +273,7 @@
     "paymentFrequency": "Tần suất trả lãi",
     "selectPaymentFrequency": "Chọn tần suất trả lãi",
     "next": "Tiếp theo",
+    "update": "Cập nhật",
     "submit": "Tạo",
     "steps": {
       "init": "Đồng ý điều khoản",
@@ -283,6 +284,7 @@
       "add-asset-collateral": "Tài sản đảm bảo"
     }
   },
+
   "infoSave": {
     "title": "Thông tin sổ tiết kiệm",
     "submit": "Tất toán"

@@ -7,11 +7,11 @@ import {
 } from 'react-native';
 import React from 'react';
 import Header from '../components/Header/Header';
-import FormCreateLoanRequest from '../components/FormCreateLoanRequest/FormCreateLoanRequest';
 import {useTheme} from '../context/ThemeContext';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../navigators/RootNavigator';
 import {RouteProp} from '@react-navigation/native';
+import FormCreateLoan from '../components/FormCreateLoanRequest/FormCreateLoanRequest';
 
 type CreateLoanRequestNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -62,7 +62,7 @@ const CreateLoanRequest: React.FC<CreateLoanRequestProps> = ({
           keyboardVerticalOffset={Platform.OS === 'ios' ? 300 : 0}
           style={{flex: 1}}>
           <View style={styles.body}>
-            <FormCreateLoanRequest
+            <FormCreateLoan
               theme={theme}
               appId={appId}
               fromScreen={fromScreen}

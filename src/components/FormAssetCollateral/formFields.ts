@@ -139,6 +139,17 @@ export const ownerInfoFields = [
     label: 'Địa chỉ thường trú',
     placeholder: 'Nhập địa chỉ thường trú',
   },
+  {
+    field: 'idIssuePlace',
+    label: 'Nơi cấp',
+    placeholder: 'Nhập nơi cấp',
+  },
+  {
+    field: 'idIssueDate',
+    label: 'Ngày cấp',
+    placeholder: 'Chọn ngày cấp',
+    isDate: true,
+  },
 ];
 
 export const vehicleFields = [
@@ -390,6 +401,17 @@ export const transferInfoFields = [
     label: 'Số CMND/CCCD',
     placeholder: 'Nhập số CMND/CCCD',
     numeric: true,
+  },
+  {
+    field: 'idIssueDate',
+    label: 'Ngày cấp',
+    placeholder: 'Chọn ngày cấp',
+    isDate: true,
+  },
+  {
+    field: 'idIssuePlace',
+    label: 'Nơi cấp',
+    placeholder: 'Nhập nơi cấp',
   },
   {
     field: 'permanentAddress',

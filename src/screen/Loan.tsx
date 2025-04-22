@@ -5,8 +5,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
-import React, {useCallback, useState} from 'react';
+import React, {useCallback} from 'react';
 import Header from '../components/Header/Header';
 import Table from '../components/Table/Table';
 import BoxAdd from '../components/BoxAdd/BoxAdd';
@@ -24,7 +25,7 @@ import {useSelector} from 'react-redux';
 import {Application} from '../api/types/getApplications';
 import {Theme} from '../theme/colors';
 import {RouteProp, useFocusEffect} from '@react-navigation/native';
-import {getworkflowbyapplicationid} from '../api/services/loan';
+import {useQuery} from '@tanstack/react-query';
 
 type LoanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Loan'>;
 
@@ -59,33 +60,57 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
   const {t} = useTranslation();
   const currentLanguage = i18n.language;
   const user = useSelector((state: RootState) => state.user.userData);
-  const [loanData, setLoanData] = useState<Application[]>([]);
-  const [dataSpending, setDataSpending] = useState<Application | undefined>(
-    undefined,
-  );
+  // Query cho danh sách applications
+  const {
+    data: applications,
+    isLoading: isLoadingApplications,
+    refetch: refetchApplications,
+  } = useQuery<Application[] | undefined>({
+    queryKey: ['applications', user?.id],
+    queryFn: () => getApplications(user?.id || ''),
+    enabled: !!user?.id,
+    // Thêm các options cho auto-refresh
+    refetchInterval: 5000, // Tự động refetch mỗi 5 giây
+    refetchOnWindowFocus: true, // Refetch khi focus lại window
+    refetchOnMount: true, // Refetch khi component mount
+    refetchOnReconnect: true, // Refetch khi có kết nối lại
+    staleTime: 1000, // Data được coi là stale sau 1 giây
+  });
+
+  // Query cho application đang xử lý (spending)
+  const {
+    data: spendingApplication,
+    isLoading: isLoadingSpending,
+    refetch: refetchSpending,
+  } = useQuery<Application | null | undefined>({
+    queryKey: ['spendingApplication', user?.id],
+    queryFn: async () => {
+      try {
+        const result = await getApplication(user?.id || '');
+        return result || null;
+      } catch (error) {
+        console.error('Error fetching spending application:', error);
+        return null;
+      }
+    },
+    enabled: !!user?.id,
+    // Thêm các options cho auto-refresh
+    refetchInterval: 5000, // Tự động refetch mỗi 5 giây
+    refetchOnWindowFocus: true, // Refetch khi focus lại window
+    refetchOnMount: true, // Refetch khi component mount
+    refetchOnReconnect: true, // Refetch khi có kết nối lại
+    staleTime: 1000, // Data được coi là stale sau 1 giây
+  });
+
+  // Sử dụng useFocusEffect để refetch data khi màn hình được focus
   useFocusEffect(
     useCallback(() => {
-      const fetchData = async () => {
-        if (user?.id) {
-          try {
-            const applications = await getApplications(user.id);
-            if (applications) {
-              setLoanData(applications);
-            }
-            const data = await getApplication(user.id);
-            setDataSpending(data);
-            console.log('Data:', data);
-          } catch (error) {
-            console.error('Error fetching loan data:', error);
-          }
-        }
-      };
-
-      fetchData();
-    }, [user]),
+      if (user?.id) {
+        refetchApplications();
+        refetchSpending();
+      }
+    }, [user?.id, refetchApplications, refetchSpending]),
   );
-
-  console.log(loanData);
 
   const value =
     currentLanguage === 'vi'
@@ -159,8 +184,9 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
   ];
 
   const transformApiDataToTableFormat = (
-    apiData: Application[],
+    apiData: Application[] | undefined,
   ): LoanBoxData[] => {
+    if (!apiData) return [];
     return apiData.map((app, index) => ({
       id: index + 1,
       boxes: [
@@ -184,7 +210,6 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
       ],
     }));
   };
-  console.log(transformApiDataToTableFormat(loanData));
 
   const calculateTotalLoanAmount = (data: LoanBoxData[]): number => {
     return data.reduce((total, item) => {
@@ -236,7 +261,18 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
       color: theme.text,
     },
   });
-
+  // Loading state
+  if (isLoadingApplications || isLoadingSpending) {
+    return (
+      <View style={[styles.view, {backgroundColor: theme.background}]}>
+        <ActivityIndicator size="large" color={theme.borderInputBackground} />
+      </View>
+    );
+  }
+  // Sử dụng data từ queries
+  const loanData: Application[] = applications || [];
+  const dataSpending = spendingApplication;
+  const transformedData = transformApiDataToTableFormat(loanData);
   return (
     <SafeAreaView style={[styles.view, {backgroundColor: theme.background}]}>
       <View style={styles.container}>
@@ -262,10 +298,10 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
 
                 <TouchableOpacity
                   style={styles.wrapContentSpending}
-                  onPress={async () => {
-                    await getworkflowbyapplicationid(dataSpending?.id);
+                  onPress={() => {
                     navigation.navigate('InfoCreateLoan', {
-                      appId: dataSpending?.id,
+                      appId:
+                        'id' in (dataSpending || {}) ? dataSpending?.id : 'N/A',
                     });
                   }}>
                   <Text style={styles.contentSpending}>
@@ -282,7 +318,7 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
 
               <Table
                 name="loan"
-                data={data} // Use loanData if available, fallback to mock data
+                data={transformedData} // Use loanData if available, fallback to mock data
                 navigation={navigation}
                 detail="InfoLoan" // TypeScript will ensure this is correct
               />

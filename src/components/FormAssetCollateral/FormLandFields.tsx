@@ -43,6 +43,20 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
     ownershipType: 'INDIVIDUAL',
     proposedValue: 0,
     documents: [],
+    ownerInfo: {
+      fullName: '',
+      dayOfBirth: '',
+      idCardNumber: '',
+      permanentAddress: '',
+    },
+    transferInfo: {
+      fullName: '',
+      dayOfBirth: '',
+      idCardNumber: '',
+      permanentAddress: '',
+      transferDate: '',
+      transferRecordNumber: '',
+    },
     application: {id: appId},
     landAsset: {
       plotNumber: '',
@@ -52,20 +66,6 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
       purpose: '',
       expirationDate: '',
       originOfUsage: '',
-      ownerInfo: {
-        fullName: '',
-        dayOfBirth: '',
-        idCardNumber: '',
-        permanentAddress: '',
-      },
-      transferInfo: {
-        fullName: '',
-        dayOfBirth: '',
-        idCardNumber: '',
-        permanentAddress: '',
-        transferDate: '',
-        transferRecordNumber: '',
-      },
       metadata: {
         zoning: '',
         frontage: '',

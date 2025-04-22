@@ -1,476 +1,284 @@
-/* eslint-disable react-native/no-inline-styles */
-import {
-  StyleSheet,
-  Text,
-  View,
-  Alert,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import React, {useState} from 'react';
-import DropdownComponent from '../DropdownComponent/DropdownComponent';
-import InputBackground from '../InputBackground/InputBackground';
-import {useTranslation} from 'react-i18next';
-import i18n from '../../../i18n';
-import {Theme} from '../../theme/colors';
-import {createCreditRating} from '../../api/services/loan';
+import {StyleSheet, Text, View, Image, TouchableOpacity} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {formatDate} from '../../utils/dateUtils';
+import {AppIcons} from '../../icons';
+import {getworkflowbyapplicationid} from '../../api/services/loan';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../navigators/RootNavigator';
-import DatePicker from '../DatePicker/DatePicker';
-import {formatDate} from '../../utils/dateUtils';
-import {RatingByCriteria, RatingByCIC} from '../../api/types/creditRating';
 
 interface FormCreditRatingProps {
-  theme: Theme;
+  theme: any;
   appId: string;
   navigation: StackNavigationProp<RootStackParamList, 'CreditRating'>;
+  data?: {
+    ratingByCriteria: {
+      score: number;
+      ratingLevel: string;
+    };
+    ratingByCIC: {
+      score: number;
+      riskLevel: string;
+      scoringDate: string;
+      term: number;
+      document: string;
+    };
+    file?: {
+      name: string;
+      size: number;
+    } | null;
+  };
 }
-
-interface TargetItem {
-  value: string;
-  label: string;
-}
-
 interface FormData {
-  ratingByCriteria: RatingByCriteria;
-  ratingByCIC: RatingByCIC;
+  scoreCriteria: number;
+  ratingLevel: string;
+  term: number;
+  scoreCIC: number;
+  document: string;
+  riskLevel: string;
+  scoringDate: string;
 }
-
-interface FormErrors {
-  'ratingByCriteria.score'?: string;
-  'ratingByCriteria.ratingLevel'?: string;
-  'ratingByCIC.score'?: string;
-  'ratingByCIC.riskLevel'?: string;
-  'ratingByCIC.document'?: string;
-  'ratingByCIC.term'?: string;
-}
-
 const FormCreditRating: React.FC<FormCreditRatingProps> = ({
   theme,
   appId,
   navigation,
 }) => {
-  const currentLanguage = i18n.language;
-  const {t} = useTranslation();
-
-  const ratingLevels = [
-    {value: 'A', label: 'A'},
-    {value: 'AA', label: 'AA'},
-    {value: 'B', label: 'B'},
-    {value: 'BB', label: 'BB'},
-    {value: 'C', label: 'C'},
-    {value: 'CC', label: 'CC'},
-  ];
-
-  const riskLevels = [
-    {value: '01', label: '01 - Low Risk'},
-    {value: '02', label: '02 - Medium Risk'},
-    {value: '03', label: '03 - High Risk'},
-  ];
-
   const [formData, setFormData] = useState<FormData>({
-    ratingByCriteria: {
-      score: 85.5,
-      ratingLevel: 'AA',
-    },
-    ratingByCIC: {
-      score: 750.5,
-      riskLevel: '01',
-      scoringDate: new Date().toISOString().split('T')[0] + 'T00:00:00Z', // Format as 2024-12-31T00:00:00Z
-      document: 'CIC_REPORT_123.pdf',
-      term: 15,
-    },
+    scoreCriteria: 0,
+    ratingLevel: '',
+    term: 0,
+    scoreCIC: 0,
+    document: '',
+    riskLevel: '',
+    scoringDate: '',
   });
-
-  console.log('formData', formData);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState(new Date());
-
-  const handleOnchange = (field: string, value: any): void => {
-    setFormData(prev => {
-      if (field.includes('.')) {
-        const [parent, child] = field.split('.') as [keyof FormData, string];
-
-        // Type guard to ensure parent is a valid key of FormData
-        if (parent === 'ratingByCriteria' || parent === 'ratingByCIC') {
-          return {
-            ...prev,
-            [parent]: {
-              ...prev[parent],
-              [child]: value,
-            },
-          };
-        }
-      }
-      // This case shouldn't be reached with the current form structure,
-      // but keeping it for any potential direct field updates
-      return {
-        ...prev,
-        [field]: value,
-      };
-    });
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-    let isValid = true;
-
-    if (!formData.ratingByCriteria.score) {
-      newErrors['ratingByCriteria.score'] =
-        currentLanguage === 'vi'
-          ? 'Vui lòng nhập điểm đánh giá'
-          : 'Please enter rating score';
-      isValid = false;
-    }
-
-    if (!formData.ratingByCriteria.ratingLevel) {
-      newErrors['ratingByCriteria.ratingLevel'] =
-        currentLanguage === 'vi'
-          ? 'Vui lòng chọn cấp độ đánh giá'
-          : 'Please select rating level';
-      isValid = false;
-    }
-
-    if (!formData.ratingByCIC.score) {
-      newErrors['ratingByCIC.score'] =
-        currentLanguage === 'vi'
-          ? 'Vui lòng nhập điểm CIC'
-          : 'Please enter CIC score';
-      isValid = false;
-    }
-
-    if (!formData.ratingByCIC.riskLevel) {
-      newErrors['ratingByCIC.riskLevel'] =
-        currentLanguage === 'vi'
-          ? 'Vui lòng chọn mức độ rủi ro'
-          : 'Please select risk level';
-      isValid = false;
-    }
-
-    if (!formData.ratingByCIC.document) {
-      newErrors['ratingByCIC.document'] =
-        currentLanguage === 'vi'
-          ? 'Vui lòng nhập tên tài liệu'
-          : 'Please enter document name';
-      isValid = false;
-    }
-
-    if (!formData.ratingByCIC.term) {
-      newErrors['ratingByCIC.term'] =
-        currentLanguage === 'vi' ? 'Vui lòng nhập kỳ hạn' : 'Please enter term';
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Submit credit rating
-      const ratingData = {
-        ratingByCriteria: formData.ratingByCriteria,
-        ratingByCIC: formData.ratingByCIC,
-      };
-
-      const response = await createCreditRating(appId, ratingData);
-
-      if (response) {
-        navigation.replace('HomeTabs', {screen: 'Loan'});
-      }
-    } catch (error: any) {
-      console.log('Error creating credit rating:', error.response);
-
-      // Type guard to check if error is an object with response property
-      const errorResponse = (error as any)?.response ?? null;
-
-      const errorMessage = errorResponse?.data?.message || '';
-
-      // Check for specific dependency error
-      if (
-        errorMessage ===
-        'Dependency step not completed (create-financial-info:inprogress)'
-      ) {
-        Alert.alert(
-          currentLanguage === 'vi' ? 'Thông báo' : 'Notification',
-          currentLanguage === 'vi'
-            ? 'Vui lòng đợi mục thông tin tài chính xác nhận'
-            : 'Please wait for financial information to be confirmed',
-        );
-      } else {
-        Alert.alert(
-          currentLanguage === 'vi' ? 'Lỗi' : 'Error',
-          currentLanguage === 'vi'
-            ? 'Có lỗi xảy ra khi tạo đánh giá tín dụng'
-            : 'Error occurred while creating credit rating',
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDatePress = () => {
-    setShowDatePicker(true);
-    setTempDate(
-      formData.ratingByCIC.scoringDate
-        ? new Date(formData.ratingByCIC.scoringDate)
-        : new Date(),
-    );
-  };
-
-  const handleDateConfirm = (dateString: string) => {
-    // Convert the date to the required format: YYYY-MM-DDT00:00:00Z
-    const date = new Date(dateString);
-    const formattedDate = date.toISOString().split('T')[0] + 'T00:00:00Z';
-
-    handleOnchange('ratingByCIC.scoringDate', formattedDate);
-    setShowDatePicker(false);
-  };
-
-  const handleDateChange = (date: Date) => {
-    setTempDate(date);
-  };
-
   const styles = StyleSheet.create({
-    boxInput: {
-      marginBottom: 12,
+    container: {
+      padding: 5,
+      backgroundColor: theme.background,
+      borderRadius: 12,
+      margin: 16,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3, // For Android shadow
     },
-    headingTitle: {
+    sectionTitle: {
+      fontSize: 18,
       fontWeight: 'bold',
-      marginBottom: 8,
       color: theme.text,
+      marginBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#ddd',
+      paddingBottom: 8,
     },
-    dateInput: {
-      padding: 12,
+    label: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    value: {
+      fontSize: 14,
+      color: '#ff0000',
+      marginBottom: 16,
+      padding: 8,
+      backgroundColor: theme.backgroundBox || '#f9f9f9',
       borderRadius: 8,
-      marginTop: 4,
-      backgroundColor: theme.inputBackground,
+    },
+    fileContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: theme.backgroundBox || '#f5f5f5',
+      borderRadius: 8,
       borderWidth: 1,
-      borderColor: theme.borderInputBackground,
+      borderColor: '#ddd',
+      marginTop: 8,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2, // For Android shadow
     },
-    dateInputText: {
-      fontSize: 14,
-      fontWeight: '400',
-      color: '#000',
+    fileIcon: {
+      width: 24,
+      height: 24,
+      marginRight: 12,
+      tintColor: theme.noteText || '#666',
     },
-    dateInputPlaceholder: {
+    fileName: {
       fontSize: 14,
-      fontWeight: '400',
+      fontWeight: '600',
+      color: theme.text,
+      marginBottom: 4,
+    },
+    fileSize: {
+      fontSize: 12,
+      color: theme.noteText || '#999',
+    },
+    downloadIcon: {
+      width: 24,
+      height: 24,
+      tintColor: '#007BFF', // Màu xanh cho biểu tượng tải xuống
+      marginLeft: 12,
+    },
+    noDocumentText: {
+      fontSize: 14,
       color: '#999',
+      fontStyle: 'italic',
+      marginTop: 8,
     },
-    btn: {
-      width: '100%',
+    navigateButton: {
+      marginTop: 20,
       backgroundColor: '#007BFF',
       padding: 12,
-      borderRadius: 12,
-      marginTop: 8,
+      borderRadius: 8,
+      alignItems: 'center',
     },
-    errorText: {
-      color: 'red',
-      fontSize: 12,
-      marginTop: 8,
+    navigateButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: 'bold',
     },
-    textWhite: {
-      color: 'white',
-    },
-    // ...other styles
   });
+  const handleNavigateToAssetCollateral = () => {
+    navigation.navigate('AssetCollateral', {
+      appId,
+      fromScreen: 'CreditRating',
+    });
+  };
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getworkflowbyapplicationid(appId);
+        if (data.result) {
+          const createLoanStep = data.result.steps.find(
+            step => step.name === 'create-credit-rating',
+          );
+          const lastValidHistory = createLoanStep?.metadata?.histories
+            ?.filter(histories => !histories?.error)
+            .at(-1);
+          if (lastValidHistory) {
+            const financialData =
+              lastValidHistory?.response.creditRatingResponse?.ratingByCriteria;
+            const financialData2 =
+              lastValidHistory?.response.creditRatingResponse?.ratingByCIC;
 
+            if (financialData) {
+              const mapLoanToFormData = (
+                financialData: any,
+                financialData2: any,
+              ): FormData => ({
+                scoreCriteria: financialData?.score || 0,
+                ratingLevel: financialData?.ratingLevel || '',
+                term: financialData2?.term || 0,
+                scoreCIC: financialData2?.score || 0,
+                document: financialData2?.document || '',
+                riskLevel: financialData2?.riskLevel || '',
+                scoringDate: financialData2?.scoringDate || '',
+              });
+              const converted = mapLoanToFormData(
+                financialData,
+                financialData2,
+              );
+              setFormData(prev => ({
+                ...prev,
+                ...converted,
+              }));
+            }
+          }
+        }
+        /*
+        // Gọi API getDocuments
+        const documents = await getDocuments();
+        if (documents && documents.length > 0) {
+          const formattedFiles: ExtendedDocumentPickerResponse[] =
+            documents.map((doc: UploadResponse) => ({
+              uri: doc.url,
+              type: doc.type || 'application/octet-stream',
+              name: doc.title || 'Unknown File',
+              fileCopyUri: null, // Default value for fileCopyUri
+              size: 0, // Default value for size
+              source: 'server', // Đánh dấu file từ server
+            }));
+
+          setSelectedFiles(formattedFiles);
+          
+        }*/
+      } catch (error) {
+        console.error('Error fetching workflow:', error);
+      }
+    };
+
+    fetchData();
+  }, [appId]);
   return (
-    <View>
-      {/* Credit Rating Criteria Section */}
-      <View style={{marginTop: 20}}>
-        <Text style={[styles.headingTitle, {fontSize: 16}]}>
-          {currentLanguage === 'vi' ? 'Đánh giá tín dụng' : 'Credit Rating'}
+    <View style={styles.container}>
+      <Text style={styles.sectionTitle}>Đánh giá tín dụng</Text>
+      <View>
+        <Text style={styles.label}>Điểm đánh giá:</Text>
+        <Text style={styles.value}>{formData?.scoreCriteria ?? '--'}</Text>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Cấp độ đánh giá:</Text>
+        <Text style={styles.value}>{formData?.ratingLevel ?? '--'}</Text>
+      </View>
+
+      <Text style={styles.sectionTitle}>Đánh giá từ CIC</Text>
+      <View>
+        <Text style={styles.label}>Điểm CIC:</Text>
+        <Text style={styles.value}>{formData?.scoreCIC ?? '--'}</Text>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Mức độ rủi ro:</Text>
+        <Text style={styles.value}>{formData?.riskLevel ?? '--'}</Text>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Ngày đánh giá:</Text>
+        <Text style={styles.value}>
+          {formData?.scoringDate
+            ? formatDate(new Date(formData.scoringDate))
+            : '--'}
         </Text>
       </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Điểm đánh giá' : 'Rating Score'}
-        </Text>
-        <InputBackground
-          placeholder={
-            currentLanguage === 'vi' ? 'Nhập điểm số' : 'Enter score'
-          }
-          keyboardType="numeric"
-          onChangeText={(value: string) =>
-            handleOnchange('ratingByCriteria.score', Number(value))
-          }
-          value={formData.ratingByCriteria.score.toString()}
-        />
-        {errors['ratingByCriteria.score'] && (
-          <Text style={styles.errorText}>
-            {errors['ratingByCriteria.score']}
-          </Text>
-        )}
+      <View>
+        <Text style={styles.label}>Kỳ hạn:</Text>
+        <Text style={styles.value}>{formData?.term ?? '--'} tháng</Text>
       </View>
 
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Cấp độ đánh giá' : 'Rating Level'}
-        </Text>
-        <DropdownComponent
-          value={formData.ratingByCriteria.ratingLevel}
-          data={ratingLevels}
-          placeholder={
-            currentLanguage === 'vi' ? 'Chọn cấp độ' : 'Select rating level'
-          }
-          onChange={(value: TargetItem) =>
-            handleOnchange('ratingByCriteria.ratingLevel', value.value)
-          }
-        />
-        {errors['ratingByCriteria.ratingLevel'] && (
-          <Text style={styles.errorText}>
-            {errors['ratingByCriteria.ratingLevel']}
-          </Text>
-        )}
-      </View>
-
-      {/* CIC Rating Section */}
-      <View style={{marginTop: 20}}>
-        <Text style={[styles.headingTitle, {fontSize: 16}]}>
-          {currentLanguage === 'vi'
-            ? 'Đánh giá từ Trung tâm CIC'
-            : 'CIC Rating'}
-        </Text>
-      </View>
-
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Điểm số CIC' : 'CIC Score'}
-        </Text>
-        <InputBackground
-          placeholder={
-            currentLanguage === 'vi' ? 'Nhập điểm số' : 'Enter score'
-          }
-          keyboardType="numeric"
-          onChangeText={(value: string) =>
-            handleOnchange('ratingByCIC.score', Number(value))
-          }
-          value={formData.ratingByCIC.score.toString()}
-        />
-        {errors['ratingByCIC.score'] && (
-          <Text style={styles.errorText}>{errors['ratingByCIC.score']}</Text>
-        )}
-      </View>
-
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Mức độ rủi ro' : 'Risk Level'}
-        </Text>
-        <DropdownComponent
-          value={formData.ratingByCIC.riskLevel}
-          data={riskLevels}
-          placeholder={
-            currentLanguage === 'vi' ? 'Chọn mức độ' : 'Select risk level'
-          }
-          onChange={(value: TargetItem) =>
-            handleOnchange('ratingByCIC.riskLevel', value.value)
-          }
-        />
-        {errors['ratingByCIC.riskLevel'] && (
-          <Text style={styles.errorText}>
-            {errors['ratingByCIC.riskLevel']}
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Ngày đánh giá' : 'Scoring Date'}
-        </Text>
-        <TouchableOpacity style={styles.dateInput} onPress={handleDatePress}>
-          <Text
-            style={
-              formData.ratingByCIC.scoringDate
-                ? styles.dateInputText
-                : styles.dateInputPlaceholder
-            }>
-            {formData.ratingByCIC.scoringDate
-              ? formatDate(new Date(formData.ratingByCIC.scoringDate))
-              : currentLanguage === 'vi'
-              ? 'Chọn ngày'
-              : 'Select date'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Tài liệu' : 'Document'}
-        </Text>
-        <InputBackground
-          placeholder={
-            currentLanguage === 'vi'
-              ? 'Nhập tên tài liệu'
-              : 'Enter document name'
-          }
-          onChangeText={(value: string) =>
-            handleOnchange('ratingByCIC.document', value)
-          }
-          value={formData.ratingByCIC.document}
-        />
-        {errors['ratingByCIC.document'] && (
-          <Text style={styles.errorText}>{errors['ratingByCIC.document']}</Text>
-        )}
-      </View>
-
-      <View style={styles.boxInput}>
-        <Text style={styles.headingTitle}>
-          {currentLanguage === 'vi' ? 'Kỳ hạn (tháng)' : 'Term (months)'}
-        </Text>
-        <InputBackground
-          placeholder={currentLanguage === 'vi' ? 'Nhập kỳ hạn' : 'Enter term'}
-          keyboardType="numeric"
-          onChangeText={(value: string) =>
-            handleOnchange('ratingByCIC.term', Number(value))
-          }
-          value={formData.ratingByCIC.term.toString()}
-        />
-        {errors['ratingByCIC.term'] && (
-          <Text style={styles.errorText}>{errors['ratingByCIC.term']}</Text>
-        )}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.btn, isLoading && {opacity: 0.7}]}
-        onPress={handleSubmit}
-        disabled={isLoading}>
-        {isLoading ? (
-          <ActivityIndicator color="white" />
+      <View>
+        <Text style={styles.label}>Tài liệu đính kèm:</Text>
+        {formData?.document ? (
+          <View style={styles.fileContainer}>
+            <Image source={AppIcons.infoIcon} style={styles.fileIcon} />
+            <View style={{flex: 1}}>
+              <Text style={styles.fileName}>{formData?.document}</Text>
+              <Text style={styles.fileSize}>Kích thước: 1.2 MB</Text>
+              {/* Thêm kích thước file nếu có */}
+            </View>
+            <TouchableOpacity onPress={() => console.log('Download file')}>
+              <Image
+                source={AppIcons.downloadIcon}
+                style={styles.downloadIcon}
+              />
+            </TouchableOpacity>
+          </View>
         ) : (
-          <Text
-            style={[
-              styles.textWhite,
-              {fontWeight: 'bold', textAlign: 'center'},
-            ]}>
-            {t('formCreateLoan.next')}
-          </Text>
+          <Text style={styles.noDocumentText}>Không có tài liệu</Text>
         )}
+      </View>
+      <TouchableOpacity
+        style={styles.navigateButton}
+        onPress={handleNavigateToAssetCollateral}>
+        <Text style={styles.navigateButtonText}>
+          Chuyển đến tài sản thế chấp
+        </Text>
       </TouchableOpacity>
-
-      {showDatePicker && (
-        <DatePicker
-          isVisible={showDatePicker}
-          onClose={() => setShowDatePicker(false)}
-          onConfirm={handleDateConfirm}
-          value={tempDate}
-          onChange={handleDateChange}
-          theme={theme}
-          locale="vi-VN"
-        />
-      )}
     </View>
   );
 };

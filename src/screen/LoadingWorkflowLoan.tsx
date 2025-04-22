@@ -49,8 +49,8 @@ const LoadingWorkflowLoan: React.FC<LoadingWorkflowLoanProps> = ({
     'CreateLoanRequest',
     'CreateLoanPlan',
     'CreateFinancialInfo',
-    'AssetCollateral',
     'CreditRating',
+    'AssetCollateral',
   ];
 
   const findNextScreen = (

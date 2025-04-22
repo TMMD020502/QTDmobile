@@ -2,6 +2,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -26,6 +27,7 @@ type AssetCollateralRouteProp = RouteProp<
 interface AssetCollateralProps {
   navigation: AssetCollateralNavigationProp;
   route: AssetCollateralRouteProp;
+  status?: string;
 }
 
 const AssetCollateral: React.FC<AssetCollateralProps> = ({
@@ -33,7 +35,10 @@ const AssetCollateral: React.FC<AssetCollateralProps> = ({
   route,
 }) => {
   const {theme} = useTheme();
-  const {appId} = route.params;
+  const {appId, status} = route.params as {
+    appId: string;
+    status?: string;
+  };
 
   const styles = StyleSheet.create({
     view: {
@@ -53,18 +58,19 @@ const AssetCollateral: React.FC<AssetCollateralProps> = ({
     <SafeAreaView style={[styles.view, {backgroundColor: theme.background}]}>
       <View style={styles.container}>
         <Header Navbar="AssetCollateral" navigation={navigation} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
-          style={{flex: 1}}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={false}>
           <View style={styles.body}>
             <FormAssetCollateral
               theme={theme}
               appId={appId}
               navigation={navigation}
+              status={status}
             />
           </View>
-        </KeyboardAvoidingView>
+        </ScrollView>
       </View>
     </SafeAreaView>
   );

@@ -7,12 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import DropdownComponent from '../DropdownComponent/DropdownComponent';
 import InputBackground from '../InputBackground/InputBackground';
 // Import the CurrencyInput component
@@ -33,9 +31,15 @@ import {
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../navigators/RootNavigator';
 import CustomMultiSelect from '../CustomMultiSelect/CustomMultiSelect';
-import {LoanRequest} from '../../api/types/loanworkflowtypes';
+import {
+  CreateLoanResponse,
+  History,
+  InterestType,
+  LoanRequest,
+} from '../../api/types/loanworkflowtypes';
 import {useRoute} from '@react-navigation/native';
-
+import {useQuery} from '@tanstack/react-query';
+import {fetchInterestRates} from '../../api/services/loan';
 //import LoanRequestService from './../../api/services/update-loan-request';
 //import axios from 'axios';
 //import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -46,6 +50,7 @@ interface FormCreateLoanRequestProps {
   theme: Theme;
   appId: string;
   fromScreen?: string;
+  status?: string;
   navigation: StackNavigationProp<RootStackParamList, 'CreateLoanRequest'>;
 }
 
@@ -59,23 +64,48 @@ interface FormData extends Omit<LoanRequest, 'application'> {
   method?: string;
 }
 
+interface LoanTermOption {
+  value: number; // Changed from string to number
+  label: string;
+  interest: number; // Changed from string to number
+}
 interface FormErrors {
   amount?: string;
   purpose?: string;
   note?: string;
   loanCollateralTypes?: string;
+  monthlyIncome?: string;
+  borrowerType?: string;
+  loanSecurityType?: string;
+  interestType?: string;
+  loanTerm?: string;
+  repaymentMethod?: string;
 }
 
+interface InterestRate {
+  id: string;
+  type: string;
+  term: number;
+  rate: number;
+  createdAt: string;
+  updatedAt: string;
+  lastModifiedBy: string;
+  createdBy: string;
+  deleted: boolean;
+}
 const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
   theme,
   navigation,
 }) => {
   const route = useRoute();
-  const {appId, fromScreen} = route.params as {
+  const {appId, fromScreen, status} = route.params as {
     appId: string;
     fromScreen?: string;
+    status?: string;
   };
   const currentLanguage = i18n.language;
+  const [transactionId, setTransactionId] = useState<string>();
+  const [isUnsecured, setIsUnsecured] = useState(false);
   const {t} = useTranslation();
 
   const borrowerTypes = [
@@ -86,6 +116,17 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     {
       value: 'ORGANIZATION',
       label: currentLanguage === 'vi' ? 'Doanh nghiệp' : 'Business',
+    },
+  ];
+
+  const interestTypes = [
+    {
+      value: 'FIXED',
+      label: currentLanguage === 'vi' ? 'Lãi suất cố định' : 'Fixed Rate',
+    },
+    {
+      value: 'FLOATING',
+      label: currentLanguage === 'vi' ? 'Lãi suất thả nổi' : 'Floating Rate',
     },
   ];
 
@@ -132,6 +173,18 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     },
   ];
 
+  const defaultTerms = useMemo(
+    () => [
+      {
+        value: 12,
+        label: currentLanguage === 'vi' ? '12 tháng' : '12 months',
+        interest: 15,
+      },
+      // ...other terms
+    ],
+    [currentLanguage],
+  );
+
   const [formData, setFormData] = useState<FormData>({
     purpose: '',
     amount: 0,
@@ -139,59 +192,93 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     loanSecurityType: 'UNSECURED',
     loanCollateralTypes: [],
     note: '',
+    monthlyIncome: 0,
+    repaymentMethod: '', //*
+    interestType: 'FIXED',
+    loanTerm: 12,
+    interestRate: 0,
     metadata: {
-      key1: '',
-      key2: '',
+      key1: 'value1',
+      key2: 'value2',
     },
   });
 
   //const [workflowData, setWorkflowData] = useState<LoanApplication | null>(null);
+  const [selectedInterest, setSelectedInterest] = useState<number | undefined>(
+    undefined,
+  );
+
+  // Removed duplicate declaration of loanTerms
 
   useEffect(() => {
     const fetchData = async () => {
+      // Tìm giá trị interest tương ứng với loanTerm
+      const selectedTerm = loanTerms.find(
+        term => term.value === formData.loanTerm,
+      );
+      setSelectedInterest(selectedTerm?.interest || undefined);
+      // Add loanTerms to the dependency array
       try {
-        const data = await getworkflowbyapplicationid(appId);
+        const data = await getworkflowbyapplicationid<CreateLoanResponse>(
+          appId,
+        );
         if (data.result) {
-          console.log(
-            '⚠️ API trả về dữ liệu ' +
-              data.result.steps.at(-1)?.metadata.histories.at(-1)?.response
-                .approvalProcessResponse?.metadata.purpose,
-          );
           const createLoanStep = data.result.steps.find(
             step => step.name === 'create-loan-request',
           );
-          const lastValidHistory = createLoanStep?.metadata?.histories
-            ?.filter(histories => !histories?.error) // Lọc ra các phần tử không có 'error'
-            .at(-1); // Lấy phần tử cuối cùng trong danh sách hợp lệ
+          console.log('id:', createLoanStep?.transactionId);
+          setTransactionId(createLoanStep?.transactionId ?? '');
+          const lastValidHistory = Array.isArray(
+            createLoanStep?.metadata?.histories,
+          )
+            ? createLoanStep?.metadata?.histories
+                ?.filter(
+                  (history: History<CreateLoanResponse>) => !history?.error,
+                )
+                .at(-1)
+            : null;
 
-          console.log(createLoanStep);
-          setFormData(prev => ({
-            ...prev,
-            purpose:
-              lastValidHistory?.response.approvalProcessResponse?.metadata
-                .purpose || '',
-            amount:
-              lastValidHistory?.response.approvalProcessResponse?.metadata
-                .amount || 0,
-            borrowerType:
-              (lastValidHistory?.response.approvalProcessResponse?.metadata
-                .borrowerType as BorrowerType) || ('' as BorrowerType),
-            loanSecurityType:
-              (lastValidHistory?.response.approvalProcessResponse?.metadata
-                .loanSecurityType as LoanSecurityType) ||
-              ('' as LoanSecurityType),
-            loanCollateralTypes:
-              (lastValidHistory?.response.approvalProcessResponse?.metadata
-                .loanCollateralTypes as LoanCollateralType[]) ||
-              ('' as LoanCollateralType),
-            note:
-              lastValidHistory?.response.approvalProcessResponse?.metadata
-                .note || '',
-            metadata: {
-              key1: 'key1',
-              key2: 'key 2',
-            },
-          }));
+          setFormData(prev => {
+            const metadata =
+              lastValidHistory?.response.approvalProcessResponse?.metadata;
+
+            return {
+              ...prev,
+              // Basic loan information
+              purpose: metadata?.purpose || '',
+              amount: metadata?.amount || 0,
+
+              // Customer and security information
+              borrowerType:
+                (metadata?.borrowerType as BorrowerType) ||
+                ('INDIVIDUAL' as BorrowerType),
+              loanSecurityType:
+                (metadata?.loanSecurityType as LoanSecurityType) ||
+                ('UNSECURED' as LoanSecurityType),
+              loanCollateralTypes:
+                (metadata?.loanCollateralTypes as LoanCollateralType[]) || [],
+
+              // Financial information
+              monthlyIncome: metadata?.monthlyIncome || 0,
+
+              // Loan terms and conditions
+              interestType:
+                (metadata?.interestType as InterestType) ||
+                ('FIXED' as InterestType),
+              loanTerm: metadata?.loanTerm || 12,
+              interestRate: metadata?.interestRate || 0,
+              repaymentMethod: metadata?.repaymentMethod || '',
+
+              // Additional information
+              note: metadata?.note || '',
+
+              // Metadata
+              metadata: {
+                key1: metadata?.key1 || '',
+                key2: metadata?.key2 || '',
+              },
+            };
+          });
         }
       } catch (error) {
         console.error('Error fetching workflow:', error);
@@ -199,33 +286,27 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     };
 
     fetchData();
-  }, [appId]);
+  }, [appId, formData.loanTerm, loanTerms]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOpen, setIsOpen] = useState(false);
   const multiSelectRef = useRef<View>(null);
 
-  console.log('Form data:', formData);
-  const handleOnchange = (field: keyof FormData, value: any): void => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
     let isValid = true;
 
+    // Validate amount
     if (!formData.amount || formData.amount <= 999999) {
       newErrors.amount =
         currentLanguage === 'vi'
           ? 'Vui lòng nhập số tiền lớn hơn 1,000,000 đ'
-          : 'Please enter a valid amount';
+          : 'Please enter an amount greater than 1,000,000 VND';
       isValid = false;
     }
 
+    // Validate purpose
     if (!formData.purpose.trim()) {
       newErrors.purpose =
         currentLanguage === 'vi'
@@ -234,17 +315,29 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       isValid = false;
     }
 
-    if (!formData.note.trim()) {
-      newErrors.note =
+    // Validate borrowerType
+    if (!formData.borrowerType) {
+      newErrors.borrowerType =
         currentLanguage === 'vi'
-          ? 'Vui lòng nhập ghi chú'
-          : 'Please enter a note';
+          ? 'Vui lòng chọn loại khách hàng'
+          : 'Please select customer type';
       isValid = false;
     }
 
+    // Validate loanSecurityType
+    if (!formData.loanSecurityType) {
+      newErrors.loanSecurityType =
+        currentLanguage === 'vi'
+          ? 'Vui lòng chọn hình thức bảo đảm'
+          : 'Please select security type';
+      isValid = false;
+    }
+
+    // Validate collateral types only if security type is MORTGAGE
     if (
-      !formData.loanCollateralTypes ||
-      formData.loanCollateralTypes.length === 0
+      formData.loanSecurityType === 'MORTGAGE' &&
+      (!formData.loanCollateralTypes ||
+        formData.loanCollateralTypes.length === 0)
     ) {
       newErrors.loanCollateralTypes =
         currentLanguage === 'vi'
@@ -253,10 +346,54 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       isValid = false;
     }
 
+    // Validate monthly income
+    if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+      newErrors.monthlyIncome =
+        currentLanguage === 'vi'
+          ? 'Vui lòng nhập thu nhập hàng tháng'
+          : 'Please enter monthly income';
+      isValid = false;
+    }
+
+    // Validate interest type
+    if (!formData.interestType) {
+      newErrors.interestType =
+        currentLanguage === 'vi'
+          ? 'Vui lòng chọn loại lãi suất'
+          : 'Please select interest type';
+      isValid = false;
+    }
+
+    // Validate loan term
+    if (!formData.loanTerm) {
+      newErrors.loanTerm =
+        currentLanguage === 'vi'
+          ? 'Vui lòng chọn kỳ hạn vay'
+          : 'Please select loan term';
+      isValid = false;
+    }
+
+    // Validate repayment method
+    if (!formData.repaymentMethod.trim()) {
+      newErrors.repaymentMethod =
+        currentLanguage === 'vi'
+          ? 'Vui lòng nhập kế hoạch trả nợ'
+          : 'Please enter repayment plan';
+      isValid = false;
+    }
+
+    // Validate note
+    if (!formData.note.trim()) {
+      newErrors.note =
+        currentLanguage === 'vi'
+          ? 'Vui lòng nhập ghi chú'
+          : 'Please enter a note';
+      isValid = false;
+    }
+
     setErrors(newErrors);
     return isValid;
   };
-
   const handleSubmit = async (_actionType: 'next' | 'update') => {
     console.log('Form data:', formData);
     if (!validateForm()) {
@@ -287,7 +424,11 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           navigation.replace('CreateLoanPlan', {appId});
         }
       } else {
-        const response = await updateLoanRequest(appId, loanData);
+        const response = await updateLoanRequest(
+          appId,
+          loanData,
+          transactionId || '',
+        );
         console.log('Loan request response:', response);
         if (response) {
           navigation.replace('InfoCreateLoan', {appId});
@@ -304,6 +445,85 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const {
+    data: interestRates,
+    isLoading: isLoadingRates,
+    error,
+    status: queryStatus, // Add status to check query state
+  } = useQuery<InterestRate[]>({
+    queryKey: ['interestRates'],
+    queryFn: async () => {
+      console.log('⏳ Starting interest rates fetch...');
+      try {
+        const response = await fetchInterestRates();
+        console.log('✅ Interest rates fetched:', response);
+        console.log('📊 Number of rates:', response?.length || 0);
+        return response;
+      } catch (err) {
+        console.error('❌ Error fetching rates:', err);
+        throw err;
+      }
+    },
+    retry: 3,
+    staleTime: 1000 * 60 * 5,
+  });
+  // 4. Add logging in useMemo
+  const loanTerms = useMemo(() => {
+    // Log current query state
+    console.log('🔄 Query Status:', queryStatus);
+    console.log('⌛ Loading:', isLoadingRates);
+    console.log('❌ Error:', error);
+
+    // Handle loading state
+    if (isLoadingRates) {
+      console.log('⏳ Loading interest rates...');
+      return defaultTerms;
+    }
+
+    // Handle error state
+    if (error) {
+      console.error('❌ Error loading interest rates:', error);
+      return defaultTerms;
+    }
+
+    // Handle success state
+    if (queryStatus === 'success' && Array.isArray(interestRates)) {
+      console.log('✅ Mapping interest rates to loan terms');
+      return interestRates.map(rate => ({
+        value: rate.term,
+        label:
+          currentLanguage === 'vi'
+            ? `${rate.term} tháng`
+            : `${rate.term} months`,
+        interest: rate.rate,
+      }));
+    }
+
+    // Fallback to default terms
+    console.log('⚠️ Using default terms');
+    return defaultTerms;
+  }, [
+    interestRates,
+    currentLanguage,
+    defaultTerms,
+    isLoadingRates,
+    error,
+    queryStatus,
+  ]);
+
+  const handleOnchange = (field: keyof FormData, value: any): void => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    if (field === 'loanTerm') {
+      console.log('Interest rates:', interestRates);
+      const selectedTerm = loanTerms.find(term => term.value === value);
+      setSelectedInterest(selectedTerm?.interest || undefined);
     }
   };
 
@@ -462,7 +682,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
 
         <View style={styles.boxInput}>
           <Text style={styles.headingTitle}>
-            {currentLanguage === 'vi' ? 'Loại người vay' : 'Borrower Type'}
+            {currentLanguage === 'vi' ? 'Loại khách hàng' : 'Customer Type'}
           </Text>
           <DropdownComponent
             value={formData.borrowerType}
@@ -471,6 +691,33 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
             onChange={(value: TargetItem) =>
               handleOnchange('borrowerType', value.value as BorrowerType)
             }
+          />
+        </View>
+
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Hình thức bảo đảm' : 'Security Type'}
+          </Text>
+          <DropdownComponent
+            value={formData.loanSecurityType}
+            data={securityTypes}
+            placeholder={
+              currentLanguage === 'vi' ? 'Chọn hình thức' : 'Select type'
+            }
+            onChange={(value: TargetItem) => {
+              handleOnchange(
+                'loanSecurityType',
+                value.value as LoanSecurityType,
+              );
+
+              // Nếu chọn "Tín Chấp", làm trống danh sách tài sản đảm bảo và khóa component
+              if (value.value === 'UNSECURED') {
+                handleOnchange('loanCollateralTypes', []); // Làm trống danh sách tài sản đảm bảo
+                setIsUnsecured(true); // Khóa component
+              } else {
+                setIsUnsecured(false); // Mở khóa component
+              }
+            }}
           />
         </View>
 
@@ -494,6 +741,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
             isOpen={isOpen}
             setIsOpen={setIsOpen}
             theme={theme}
+            disabled={isUnsecured}
           />
           {errors.loanCollateralTypes && (
             <Text style={styles.errorText}>{errors.loanCollateralTypes}</Text>
@@ -502,21 +750,88 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
 
         <View style={styles.boxInput}>
           <Text style={styles.headingTitle}>
-            {currentLanguage === 'vi' ? 'Hình thức bảo đảm' : 'Security Type'}
+            {currentLanguage === 'vi'
+              ? 'Thu nhập hàng tháng'
+              : 'Monthly Income'}
           </Text>
-          <DropdownComponent
-            value={formData.loanSecurityType}
-            data={securityTypes}
+          <CurrencyInput
             placeholder={
-              currentLanguage === 'vi' ? 'Chọn hình thức' : 'Select type'
+              currentLanguage === 'vi' ? 'Nhập thu nhập' : 'Enter income'
             }
-            onChange={(value: TargetItem) =>
-              handleOnchange(
-                'loanSecurityType',
-                value.value as LoanSecurityType,
-              )
+            value={formData.monthlyIncome}
+            onChangeText={(value: number) =>
+              handleOnchange('monthlyIncome', value)
             }
           />
+          {errors.monthlyIncome && (
+            <Text style={styles.errorText}>{errors.monthlyIncome}</Text>
+          )}
+        </View>
+
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Loại lãi suất' : 'Interest Type'}
+          </Text>
+          <DropdownComponent
+            value={formData.interestType}
+            data={interestTypes} // Thay đổi từ borrowerTypes sang interestTypes
+            placeholder={
+              currentLanguage === 'vi'
+                ? 'Chọn loại lãi suất'
+                : 'Select interest type'
+            }
+            onChange={(value: TargetItem) =>
+              handleOnchange('interestType', value.value as InterestType)
+            }
+          />
+          {errors.interestType && (
+            <Text style={styles.errorText}>{errors.interestType}</Text>
+          )}
+        </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Kỳ hạn vay' : 'Loan Term'}
+          </Text>
+          <DropdownComponent
+            value={formData.loanTerm}
+            data={loanTerms}
+            placeholder={
+              currentLanguage === 'vi' ? 'Chọn kỳ hạn' : 'Select term'
+            }
+            onChange={(item: LoanTermOption) =>
+              handleOnchange('loanTerm', item.value)
+            }
+          />
+          {selectedInterest && (
+            <Text style={styles.rateText}>
+              {currentLanguage === 'vi'
+                ? `Lãi suất kỳ hạn vay ${
+                    loanTerms.find(term => term.value === formData.loanTerm)
+                      ?.label || ''
+                  }: ${selectedInterest}%`
+                : `Interest rate for ${
+                    loanTerms.find(term => term.value === formData.loanTerm)
+                      ?.label || ''
+                  }: ${selectedInterest}%`}
+            </Text>
+          )}
+        </View>
+        <View style={styles.boxInput}>
+          <Text style={styles.headingTitle}>
+            {currentLanguage === 'vi' ? 'Kế hoạch trả nợ' : 'Repayment Plan'}
+          </Text>
+          <InputBackground
+            placeholder={
+              currentLanguage === 'vi' ? 'Nhập kế hoạch' : 'Enter plan'
+            }
+            onChangeText={(value: string) =>
+              handleOnchange('repaymentMethod', value)
+            }
+            value={formData.repaymentMethod}
+          />
+          {errors.repaymentMethod && (
+            <Text style={styles.errorText}>{errors.repaymentMethod}</Text>
+          )}
         </View>
 
         <View style={styles.boxInput}>
@@ -530,11 +845,10 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
             onChangeText={(value: string) => handleOnchange('note', value)}
             value={formData.note}
           />
-          {errors.note && <Text style={styles.errorText}>{errors.note}</Text>}
         </View>
 
         <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-          {fromScreen === 'InfoCreateLoan' ? (
+          {status === 'completed' ? null : fromScreen === 'InfoCreateLoan' ? (
             <TouchableOpacity
               style={[
                 styles.btn,

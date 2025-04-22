@@ -23,7 +23,6 @@ import SentSaveScreen from '../screen/SentSave';
 import DepositScreen from '../screen/Deposit';
 import TransferScreen from '../screen/Transfer';
 import CreateLoanRequestScreen from '../screen/CreateLoanRequest';
-import CreateLoanPlanScreen from '../screen/CreateLoanPlan';
 import CreateFinancialInfoScreen from '../screen/CreateFinancialInfo';
 import CreditRatingScreen from '../screen/CreditRating';
 import AssetCollateralScreen from '../screen/AssetCollateral';
@@ -303,7 +302,6 @@ const AppStack = () => (
       name="CreateLoanRequest"
       component={CreateLoanRequestScreen}
     />
-    <Stack.Screen name="CreateLoanPlan" component={CreateLoanPlanScreen} />
     <Stack.Screen
       name="CreateFinancialInfo"
       component={CreateFinancialInfoScreen}

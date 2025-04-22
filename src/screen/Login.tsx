@@ -30,7 +30,7 @@ const windowHeight = Dimensions.get('window').height;
 
 const Login: React.FC<LoginProps> = ({navigation}) => {
   const [formData, setFormData] = useState<FormData>({
-    username: 'd@gmail.com',
+    username: 'demo@gmail.com',
     password: '123456',
   });
   const [invisible, setInvisible] = useState<boolean>(true);
@@ -82,7 +82,7 @@ const Login: React.FC<LoginProps> = ({navigation}) => {
     console.log('Login:', username, password);
     const result = await login(username, password);
 
-    console.log('Result: ', result);
+    console.log('Result: ', JSON.stringify(result));
     if (result === true) {
       // navigation.navigate('HomeTabs');
     } else {

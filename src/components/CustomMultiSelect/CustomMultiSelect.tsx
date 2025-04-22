@@ -26,6 +26,7 @@ interface CustomMultiSelectProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   theme: Theme;
+  disabled?: boolean;
 }
 
 const CustomMultiSelect = forwardRef(
@@ -39,6 +40,7 @@ const CustomMultiSelect = forwardRef(
       isOpen,
       setIsOpen,
       theme,
+      disabled,
     }: CustomMultiSelectProps,
     ref: ForwardedRef<View>,
   ) => {
@@ -53,6 +55,17 @@ const CustomMultiSelect = forwardRef(
     const dropdownHeight = Math.min(spaceBelow - 100, MAX_DROPDOWN_HEIGHT);
 
     const styles = StyleSheet.create({
+      inputContainer1: {
+        backgroundColor: '#f4f4f4',
+        borderRadius: 8,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#ddd',
+      },
+      disabledInput: {
+        backgroundColor: '#e0e0e0', // Gray background for disabled state
+        borderColor: '#ccc', // Lighter border color
+      },
       multiSelectContainer: {
         position: 'relative',
       },
@@ -214,9 +227,18 @@ const CustomMultiSelect = forwardRef(
         style={styles.multiSelectContainer}
         onLayout={measureInput}>
         <TouchableOpacity
-          style={styles.inputContainer}
-          onPress={() => setIsOpen(!isOpen)}
-          activeOpacity={0.7}>
+          style={[
+            styles.inputContainer1,
+            disabled && styles.disabledInput,
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            },
+          ]}
+          onPress={() => !disabled && setIsOpen(!isOpen)} // Prevent opening if disabled
+          activeOpacity={disabled ? 1 : 0.7} // Disable touch feedback if disabled
+        >
           <View style={styles.tagsContainer}>
             {value.length > 0 ? (
               value.map((type: string) => {

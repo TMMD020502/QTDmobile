@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unstable-nested-components */
-import React, {useCallback, useState} from 'react';
+import React, {useCallback} from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -17,8 +17,9 @@ import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../navigators/RootNavigator';
 import {RouteProp, useFocusEffect} from '@react-navigation/native';
 import {cancelLoan, fetchWorkflowStatus} from '../api/services/loan';
-import {WorkflowResult} from '../api/types/loanInit';
+//import {WorkflowResult} from '../api/types/loanInit';
 import {clearAccessApprovalProcessIdn} from '../../tokenStorage';
+import {useQuery} from '@tanstack/react-query';
 
 type InfoCreateLoanNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -35,38 +36,44 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
   const {t} = useTranslation();
   const {isDarkMode, theme} = useTheme();
   const {appId} = route.params;
-  const [loanSteps, setLoanSteps] = useState<WorkflowResult | undefined>(
-    undefined,
-  );
 
   console.log('appId', appId);
 
-  const checkWorkflowStatus = useCallback(
-    async (retryCount = 0) => {
+  const {
+    data: workflowData,
+    isLoading,
+    refetch: refetchWorkflow,
+  } = useQuery({
+    queryKey: ['workflowStatus', appId],
+    queryFn: async () => {
       try {
         const response = await fetchWorkflowStatus(appId);
-        console.log('response', response);
         if (!response || response.code !== 200) {
-          if (retryCount < 1) {
-            console.log('Workflow status failed, retrying...');
-            setTimeout(() => checkWorkflowStatus(retryCount + 1), 1000);
-            return;
-          }
-          console.log('Workflow status failed after retry');
-          return;
+          throw new Error('Failed to fetch workflow status');
         }
-        setLoanSteps(response.result);
+        return response.result;
       } catch (error) {
-        console.log('Error checking workflow status: ', error);
+        console.error('Error fetching workflow status:', error);
+        throw error;
       }
     },
-    [appId, setLoanSteps],
-  ); // Thêm dependencies cần thiết
+    enabled: !!appId,
+    retry: 1,
+    retryDelay: 1000,
+    // Auto refresh options
+    refetchInterval: 5000, // Tự động refetch mỗi 5 giây
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
+    staleTime: 1000,
+  });
 
   useFocusEffect(
     useCallback(() => {
-      checkWorkflowStatus();
-    }, [checkWorkflowStatus]), // Đưa vào dependency
+      if (appId) {
+        refetchWorkflow();
+      }
+    }, [appId, refetchWorkflow]),
   );
 
   const handleCancelLoan = () => {
@@ -273,32 +280,20 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
         );
     }
   };
-  /*
-  const renderStep = (
-    step: string,
-    status: 'completed' | 'processing' | 'pending',
-  ) => (
-    <View
-      key={step}
-      style={[
-        styles.stepContainer,
-        status === 'completed'
-          ? styles.completedStep
-          : status === 'processing'
-          ? styles.processingStep
-          : styles.pendingStep,
-      ]}>
-      {renderStepIcon(status)}
-      <Text style={styles.stepText}>{t(`formCreateLoan.steps.${step}`)}</Text>
-    </View>
-  );
-*/
+  // Loading state
+  if (isLoading) {
+    return (
+      <View style={[styles.view, {backgroundColor: theme.background}]}>
+        <ActivityIndicator size="large" color={theme.borderInputBackground} />
+      </View>
+    );
+  }
 
   const renderStep = (
     step: string,
     status: 'completed' | 'processing' | 'pending',
   ) => {
-    const isPressable = status === 'processing'; // Chỉ cho phép nhấn khi đang xử lý
+    const isPressable = status === 'processing' || status === 'completed'; // Chỉ cho phép nhấn khi đang xử lý
 
     return (
       <TouchableOpacity
@@ -312,7 +307,7 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
             : styles.pendingStep,
           !isPressable && styles.disabledStep, // Nếu không thể nhấn thì làm mờ
         ]}
-        onPress={() => isPressable && handleStepPress(step)} // Chỉ chạy onPress nếu isPressable
+        onPress={() => isPressable && handleStepPress(step, status)} // Chỉ chạy onPress nếu isPressable
         disabled={!isPressable} // Chặn sự kiện onPress nếu không phải "processing"
       >
         {renderStepIcon(status)}
@@ -322,34 +317,32 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
   };
 
   // Hàm hiển thị dialog khi nhấn vào step
-  const handleStepPress = (step: string) => {
+  const handleStepPress = (step: string, status: string) => {
     console.log('Step' + step);
     if (step === 'create-loan-request') {
       navigation.navigate('CreateLoanRequest', {
         appId,
         fromScreen: 'InfoCreateLoan',
-      }); // Điều hướng sang màn hình CreateLoanRequest
+        status: status,
+      });
     } else if (step === 'add-asset-collateral') {
       navigation.navigate('AssetCollateral', {
         appId,
         fromScreen: 'InfoCreateLoan',
-      }); // Điều hướng sang màn hình CreateLoanRequest
-    } else if (step === 'create-loan-plan') {
-      console.log('Trang hiện tại InfoCreateLoan');
-      navigation.navigate('CreateLoanPlan', {
-        appId,
-        fromScreen: 'InfoCreateLoan',
-      }); // Điều hướng sang màn hình CreateLoanRequest
+        status: status,
+      });
     } else if (step === 'create-financial-info') {
       navigation.navigate('CreateFinancialInfo', {
         appId,
         fromScreen: 'InfoCreateLoan',
-      }); // Điều hướng sang màn hình CreateLoanRequest
+        status: status,
+      });
     } else if (step === 'create-credit-rating') {
       navigation.navigate('CreditRating', {
         appId,
         fromScreen: 'InfoCreateLoan',
-      }); // Điều hướng sang màn hình CreateLoanRequest
+        status: status,
+      });
     } else {
       Alert.alert('Thông báo', `Bạn đã nhấn vào bước: ${step}`, [
         {text: 'OK', onPress: () => console.log('OK Pressed')},
@@ -406,16 +399,16 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Legend />
           <View style={styles.optionsContainer}>
-            {loanSteps?.prevSteps &&
-              filterAllowedSteps(loanSteps.prevSteps).map(step =>
+            {workflowData?.prevSteps &&
+              filterAllowedSteps(workflowData.prevSteps).map(step =>
                 renderStep(step, 'completed'),
               )}
-            {loanSteps?.currentSteps &&
-              filterAllowedSteps(loanSteps.currentSteps).map(step =>
+            {workflowData?.currentSteps &&
+              filterAllowedSteps(workflowData.currentSteps).map(step =>
                 renderStep(step, 'processing'),
               )}
-            {loanSteps?.nextSteps &&
-              filterAllowedSteps(loanSteps.nextSteps).map(step =>
+            {workflowData?.nextSteps &&
+              filterAllowedSteps(workflowData.nextSteps).map(step =>
                 renderStep(step, 'pending'),
               )}
           </View>

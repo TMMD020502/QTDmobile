@@ -11,15 +11,17 @@ import {
 
 export const getApplication = async (
   customerId: string,
-): Promise<Application | undefined> => {
+): Promise<Application | null> => {
+  // Thay đổi return type
   try {
     const response = await axiosInstance.get<
-      ApiResponse<ApplicationsListResponse>>(`/applications?filter=customer.id:'${customerId}' and status:'CREATING'`);
+      ApiResponse<ApplicationsListResponse>
+    >(`/applications?filter=customer.id:'${customerId}' and status:'CREATING'`);
 
-    return response.data.result.content[0];
+    return response.data.result.content[0] || null; // Return null nếu không có kết quả
   } catch (error) {
-    console.log('Error fetching application:', (error as any).response);
-    return undefined;
+    console.error('Error fetching application:', error);
+    return null; // Return null khi có lỗi
   }
 };
 
@@ -27,7 +29,9 @@ export const getApplications = async (
   customerId: string,
 ): Promise<Application[] | undefined> => {
   try {
-    const response = await axiosInstance.get<ApiResponse<ApplicationsListResponse>>(`/applications?filter=customer.id:'${customerId}'`);
+    const response = await axiosInstance.get<
+      ApiResponse<ApplicationsListResponse>
+    >(`/applications?filter=customer.id:'${customerId}'`);
 
     return response.data.result.content;
   } catch (error) {

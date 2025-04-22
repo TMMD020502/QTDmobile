@@ -117,3 +117,16 @@ export interface CancelLoanResponse {
     [key: string]: any;
   };
 }
+
+export interface InterestRate {
+  histories: History[];
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  lastModifiedBy: string;
+  createdBy: string;
+  type: string;
+  term: number;
+  rate: number;
+  deleted: boolean;
+}

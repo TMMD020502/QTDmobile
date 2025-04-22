@@ -95,7 +95,7 @@ export const darkTheme: Theme = {
   backgroundIcon: '#000',
   iconColor: '#fff',
   iconColorActive: '#007BFF',
-  backgroundBox: '#444950',
+  backgroundBox: '#2C3038',
   textActive: '#ffffff',
   buttonSubmit: '#007BFF',
   textButtonSubmit: '#fff',

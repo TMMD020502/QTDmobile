@@ -1,4 +1,4 @@
-import { User } from './types/user';
+import {User} from './types/user';
 
 export enum ApiEndpoints {
   GET_USER_PROFILE = '/customers/profile',
@@ -8,8 +8,8 @@ export enum ApiEndpoints {
 
 export interface EndpointTypes {
   [ApiEndpoints.GET_USER_PROFILE]: User;
-  [ApiEndpoints.UPLOAD_IMAGE]: { url: string };
-  [ApiEndpoints.CREATE_PRODUCT]: { id: string };
+  [ApiEndpoints.UPLOAD_IMAGE]: {url: string};
+  [ApiEndpoints.CREATE_PRODUCT]: {id: string};
 }
 
 export type EndpointKeys = keyof typeof ApiEndpoints;

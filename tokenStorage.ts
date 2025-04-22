@@ -3,10 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const TOKEN_KEYS = {
   ACCESS: 'accessToken',
   REFRESH: 'refreshToken',
-  ASSETSAPPROVALPROCESSID: 'assetsApprovalProcessId',
-  LOANPLANAPPROVALPROCESSLD: 'loanplanapprovalprocessld',
+
   FINANCIALINFOAPPROVALPROCESSID: 'financialinfoapprovalprocessid',
-  DOCUMENTID: 'documentId',
+  FINANCIADOCUMENTID: 'documentId',
+  CREDITRATINGDOCUMENTID: 'documentId',
+  ADDASSETSAPPROVALPROCESSID: 'addAssetsApprovalProcessId',
 } as const;
 
 // Đơn giản hóa error handling
@@ -58,34 +59,6 @@ export const clearTokens = () =>
     'clearing tokens',
   );
 
-export const saveAccessApprovalProcessId = (approvalProcessId: string) =>
-  handleStorageOperation(
-    () =>
-      AsyncStorage.setItem(
-        TOKEN_KEYS.ASSETSAPPROVALPROCESSID,
-        approvalProcessId,
-      ),
-    'saving access ApprovalProcessId',
-  );
-
-export const getAccessApprovalProcessId = () =>
-  handleStorageOperation(
-    () => AsyncStorage.getItem(TOKEN_KEYS.ASSETSAPPROVALPROCESSID),
-    'getting access ApprovalProcessId',
-  );
-
-export const saveLoanPlanApprovalProcessId = (
-  loanPlanAprovalProcessId: string,
-) =>
-  handleStorageOperation(
-    () =>
-      AsyncStorage.setItem(
-        TOKEN_KEYS.LOANPLANAPPROVALPROCESSLD,
-        loanPlanAprovalProcessId,
-      ),
-    'saving access LoanPlanApprovalProcessId',
-  );
-
 export const getFinancialInfoApprovalProcessId = () =>
   handleStorageOperation(
     () => AsyncStorage.getItem(TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID),
@@ -103,40 +76,56 @@ export const saveFinancialInfoApprovalProcessId = (
     'saving access LoanPlanApprovalProcessId',
   );
 
-export const getLoanPlanApprovalProcessId = () =>
-  handleStorageOperation(
-    () => AsyncStorage.getItem(TOKEN_KEYS.LOANPLANAPPROVALPROCESSLD),
-    'getting access LoanPlanApprovalProcessId',
-  );
-export const saveDocumentIds = (documentIds: string[]) =>
+export const saveFinanciaDocumentIds = (documentIds: string[]) =>
   handleStorageOperation(
     () =>
       AsyncStorage.setItem(
-        TOKEN_KEYS.DOCUMENTID,
+        TOKEN_KEYS.FINANCIADOCUMENTID,
         JSON.stringify(documentIds), // Chuyển đổi mảng thành chuỗi JSON
       ),
     'saving document IDs',
   );
-export const getDocumentIds = async (): Promise<string[] | null> =>
+export const getFinanciaDocumentIds = async (): Promise<string[] | null> =>
   handleStorageOperation(async () => {
-    const storedIds = await AsyncStorage.getItem(TOKEN_KEYS.DOCUMENTID);
+    const storedIds = await AsyncStorage.getItem(TOKEN_KEYS.FINANCIADOCUMENTID);
     return storedIds ? JSON.parse(storedIds) : []; // Chuyển đổi chuỗi JSON thành mảng
   }, 'getting document IDs');
+
+export const saveAddAssetsApprovalProcessId = (
+  AddAssetsApprovalProcessId: string,
+) =>
+  handleStorageOperation(
+    () =>
+      AsyncStorage.setItem(
+        TOKEN_KEYS.ADDASSETSAPPROVALPROCESSID,
+        AddAssetsApprovalProcessId,
+      ),
+    'saving AssetsApprovalProcessId',
+  );
+
+export const getAddAssetsApprovalProcessId = () =>
+  handleStorageOperation(
+    () => AsyncStorage.getItem(TOKEN_KEYS.ADDASSETSAPPROVALPROCESSID),
+    'getting AssetsApprovalProcessId',
+  );
+
 export const clearAccessApprovalProcessIdn = async () => {
   await handleStorageOperation(
     () =>
       AsyncStorage.multiRemove([
-        TOKEN_KEYS.ASSETSAPPROVALPROCESSID,
-        TOKEN_KEYS.LOANPLANAPPROVALPROCESSLD,
         TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID,
+        TOKEN_KEYS.ADDASSETSAPPROVALPROCESSID,
       ]),
     'clearing ApprovalProcessId',
   );
-  await handleStorageOperation(
-    () => AsyncStorage.removeItem(TOKEN_KEYS.DOCUMENTID),
+  clearFinanciaDocumentIds();
+};
+export const clearFinanciaDocumentIds = () =>
+  handleStorageOperation(
+    () => AsyncStorage.removeItem(TOKEN_KEYS.FINANCIADOCUMENTID),
     'clearing document IDs',
   );
-};
+
 export const isTokenExpired = (token: string): boolean => {
   try {
     const [, payload] = token.split('.');

@@ -26,14 +26,14 @@ const InputBackground = forwardRef<TextInput, InputBackgroundProps>(
     const styles = StyleSheet.create({
       container: {
         backgroundColor: theme.inputBackground,
-        borderRadius: 8,
+        borderRadius: 6,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: theme.borderInputBackground,
       },
       input: {
-        height: 40,
-        paddingHorizontal: 15,
+        height: 38,
+        paddingHorizontal: 6,
         fontSize: 14,
         color: '#000',
         width: '100%',
