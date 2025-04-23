@@ -14,9 +14,14 @@ export interface UploadRequest {
 export interface UploadResponse {
   code: number;
   message: string;
-  result: UploadRequest;
+  result: UploadResponseResult;
 }
-
+export interface UploadResponseResult {
+  url?: string;
+  type?: string;
+  title?: string;
+  id?: string;
+}
 export enum UploadErrorCode {
   FILE_TOO_LARGE = 413,
   UNSUPPORTED_FORMAT = 415,

@@ -7,9 +7,13 @@ export const createStyles = (theme: Theme) =>
       marginBottom: 12,
     },
     headingTitle: {
+      fontSize: 16,
       fontWeight: 'bold',
-      marginBottom: 8,
+      marginBottom: 10,
       color: theme.text,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.buttonSubmit,
+      paddingLeft: 8,
     },
     uploadSection: {
       borderRadius: 12,

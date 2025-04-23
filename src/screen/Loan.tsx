@@ -194,7 +194,10 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
           key: t('loan.fields.loanAmount'),
           value: app.amount ? `${app.amount} đ` : 'N/A',
         },
-        {key: t('loan.fields.contractNumber'), value: app.id || 'N/A'},
+        {
+          key: t('loan.fields.contractNumber'),
+          value: app.applicationCode || 'N/A',
+        },
         {key: t('loan.fields.purpose'), value: app.purpose || 'N/A'},
         {
           key: t('loan.fields.term'),

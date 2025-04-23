@@ -3,11 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const TOKEN_KEYS = {
   ACCESS: 'accessToken',
   REFRESH: 'refreshToken',
-
-  FINANCIALINFOAPPROVALPROCESSID: 'financialinfoapprovalprocessid',
-  FINANCIADOCUMENTID: 'documentId',
-  CREDITRATINGDOCUMENTID: 'documentId',
-  ADDASSETSAPPROVALPROCESSID: 'addAssetsApprovalProcessId',
 } as const;
 
 // Đơn giản hóa error handling
@@ -57,73 +52,6 @@ export const clearTokens = () =>
   handleStorageOperation(
     () => AsyncStorage.multiRemove([TOKEN_KEYS.ACCESS, TOKEN_KEYS.REFRESH]),
     'clearing tokens',
-  );
-
-export const getFinancialInfoApprovalProcessId = () =>
-  handleStorageOperation(
-    () => AsyncStorage.getItem(TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID),
-    'getting access LoanPlanApprovalProcessId',
-  );
-export const saveFinancialInfoApprovalProcessId = (
-  financialinfoAprovalProcessId: string,
-) =>
-  handleStorageOperation(
-    () =>
-      AsyncStorage.setItem(
-        TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID,
-        financialinfoAprovalProcessId,
-      ),
-    'saving access LoanPlanApprovalProcessId',
-  );
-
-export const saveFinanciaDocumentIds = (documentIds: string[]) =>
-  handleStorageOperation(
-    () =>
-      AsyncStorage.setItem(
-        TOKEN_KEYS.FINANCIADOCUMENTID,
-        JSON.stringify(documentIds), // Chuyển đổi mảng thành chuỗi JSON
-      ),
-    'saving document IDs',
-  );
-export const getFinanciaDocumentIds = async (): Promise<string[] | null> =>
-  handleStorageOperation(async () => {
-    const storedIds = await AsyncStorage.getItem(TOKEN_KEYS.FINANCIADOCUMENTID);
-    return storedIds ? JSON.parse(storedIds) : []; // Chuyển đổi chuỗi JSON thành mảng
-  }, 'getting document IDs');
-
-export const saveAddAssetsApprovalProcessId = (
-  AddAssetsApprovalProcessId: string,
-) =>
-  handleStorageOperation(
-    () =>
-      AsyncStorage.setItem(
-        TOKEN_KEYS.ADDASSETSAPPROVALPROCESSID,
-        AddAssetsApprovalProcessId,
-      ),
-    'saving AssetsApprovalProcessId',
-  );
-
-export const getAddAssetsApprovalProcessId = () =>
-  handleStorageOperation(
-    () => AsyncStorage.getItem(TOKEN_KEYS.ADDASSETSAPPROVALPROCESSID),
-    'getting AssetsApprovalProcessId',
-  );
-
-export const clearAccessApprovalProcessIdn = async () => {
-  await handleStorageOperation(
-    () =>
-      AsyncStorage.multiRemove([
-        TOKEN_KEYS.FINANCIALINFOAPPROVALPROCESSID,
-        TOKEN_KEYS.ADDASSETSAPPROVALPROCESSID,
-      ]),
-    'clearing ApprovalProcessId',
-  );
-  clearFinanciaDocumentIds();
-};
-export const clearFinanciaDocumentIds = () =>
-  handleStorageOperation(
-    () => AsyncStorage.removeItem(TOKEN_KEYS.FINANCIADOCUMENTID),
-    'clearing document IDs',
   );
 
 export const isTokenExpired = (token: string): boolean => {

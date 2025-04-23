@@ -31,20 +31,13 @@ import {AppIcons} from '../../icons';
 import {Formik, FormikProps} from 'formik';
 import * as Yup from 'yup';
 import i18n from '../../../i18n';
-import {
-  getDocuments,
-  uploadImage,
-} from '../../api/services/uploadImage';
+import {getDocuments, uploadImage} from '../../api/services/uploadImage';
 import {useRoute} from '@react-navigation/native';
-import {CreateFinancialInfo} from '../../api/types/loanworkflowtypes';
-import {
-  clearFinanciaDocumentIds,
-  getFinanciaDocumentIds,
-  saveFinanciaDocumentIds,
-} from '../../../tokenStorage';
+import {CreateFinancialInfo, History} from '../../api/types/loanworkflowtypes';
 import FileViewer from 'react-native-file-viewer';
 import {UploadResponse} from '../../api/types/upload';
 import ImageDisplay from '../ImageDisplay/ImageDisplay';
+import {ApiResponse} from '../../api/axiosInstance';
 
 interface FormCreateFinancialInfoProps {
   theme: Theme;
@@ -81,6 +74,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     status?: string;
   };
   const {t} = useTranslation();
+  const [transactionId, setTransactionId] = useState<string>();
   const formikRef = useRef<FormikProps<FormData>>(null); // Create a ref for Formik
   const currentLanguage = i18n.language;
   const [formData, setFormData] = useState<FormData>({
@@ -122,7 +116,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       console.error('Error opening file with original URI:', error);
     }
   };
-  
+
   const handleDocumentPick = async () => {
     const res = await DocumentPicker.pick({
       type: [DocumentPicker.types.allFiles], // Chọn loại tệp bạn muốn cho phép
@@ -153,12 +147,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       console.log('📌 Id:', uploadResponse.id);
 
       setSelectedFiles(prev => [...prev, File]);
-      // Lấy danh sách id hiện tại từ AsyncStorage
-      const existingIds = (await getFinanciaDocumentIds()) || [];
 
-      // Thêm id mới vào danh sách
-      const updatedIds = [...existingIds, uploadResponse.id ?? ''];
-      await saveFinanciaDocumentIds(updatedIds);
       formikRef.current?.setFieldValue('files', [
         ...(formikRef.current?.values.files || []),
         uploadResponse.id,
@@ -172,7 +161,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       'files',
       formikRef.current?.values.files.filter((_, i) => i !== index),
     );
-    clearFinanciaDocumentIds();
   };
 
   const handleSubmit = async (values: FormData, _actionType: string) => {
@@ -190,12 +178,16 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
         console.log('Files before API call:', formikRef.current?.values);
         console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
         const response = await financialInfo(appId, filteredValues);
-        if (response.code === 200) {
+        if (response.code === 201) {
           navigation.replace('LoadingWorkflowLoan', {appId});
         }
       } else if (actionType === 'update') {
         console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
-        const response = await updateFinancialInfo(appId, filteredValues);
+        const response = await updateFinancialInfo(
+          appId,
+          filteredValues,
+          transactionId || '',
+        );
         if (response.code === 200) {
           navigation.goBack();
         }
@@ -399,63 +391,105 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
   });
   useEffect(() => {
     const fetchData = async () => {
-      
       try {
-        const data = await getworkflowbyapplicationid<CreateFinancialInfo>(appId);
+        const data = await getworkflowbyapplicationid<CreateFinancialInfo>(
+          appId,
+        );
         if (data.result) {
           const createLoanStep = data.result.steps.find(
             step => step.name === 'create-financial-info',
           );
-          const lastValidHistory = createLoanStep?.metadata?.histories
-            ?.filter(histories => !histories?.error)
-            .at(-1);
+          setTransactionId(createLoanStep?.transactionId ?? '');
+          const lastValidHistory = Array.isArray(
+            createLoanStep?.metadata?.histories,
+          )
+            ? createLoanStep?.metadata?.histories
+                ?.filter(
+                  (history: History<CreateFinancialInfo>) => !history?.error,
+                )
+                .at(-1)
+            : null;
           if (lastValidHistory) {
             const financialData =
               lastValidHistory?.response.approvalProcessResponse?.metadata;
 
             if (financialData) {
-              const mapLoanToFormData = (financialData: CreateFinancialInfo[]): FormData => ({
-                jobTitle: financialData[0]?.jobTitle || '',
-                companyName: financialData[0]?.companyName || '',
-                companyAddress: financialData[0]?.companyAddress || '',
-                hasMarried: financialData[0]?.hasMarried || false,
-                totalIncome: financialData[0]?.totalIncome || 0,
-                monthlyExpense: financialData[0]?.monthlyExpense || 0,
-                monthlySaving: financialData[0]?.monthlySaving || 0,
-                monthlyDebt: financialData[0]?.monthlyDebt || 0,
-                monthlyLoanPayment: financialData[0]?.monthlyLoanPayment || 0,
-                files: [],
+              // Update form data including files
+              const converted = {
+                jobTitle: financialData?.jobTitle || '',
+                companyName: financialData?.companyName || '',
+                companyAddress: financialData?.companyAddress || '',
+                hasMarried: financialData?.hasMarried || false,
+                totalIncome: financialData?.totalIncome || 0,
+                monthlyExpense: financialData?.monthlyExpense || 0,
+                monthlySaving: financialData?.monthlySaving || 0,
+                monthlyDebt: financialData?.monthlyDebt || 0,
+                monthlyLoanPayment: financialData?.monthlyLoanPayment || 0,
+                files: financialData?.files || [],
                 actionType: '',
-              });
+              };
 
-              const converted = mapLoanToFormData(financialData);
-              setFormData(prev => ({
-                ...prev,
-                ...converted,
-              }));
+              // Update formData state
+              setFormData(converted);
 
-              // Use Formik's setValues if available
+              // Update Formik values
               if (formikRef.current) {
                 formikRef.current.setValues(converted);
               }
+
+              // Fetch and format documents if files exist
+              // Inside useEffect
+              if (financialData.files?.length > 0) {
+                try {
+                  console.log('Files to fetch:', financialData.files);
+                  const documents = await getDocuments(financialData.files);
+                  console.log('Raw documents response:', documents);
+
+                  if (Array.isArray(documents) && documents.length > 0) {
+                    const formattedFiles = documents
+                      .filter((doc): doc is ApiResponse<UploadResponse> => {
+                        if (
+                          !doc ||
+                          !doc.result ||
+                          typeof doc.status !== 'number'
+                        ) {
+                          console.log('Filtering out invalid doc:', doc);
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map(doc => {
+                        console.log('Processing document:', doc);
+                        return {
+                          uri: doc.result.result.url || '',
+                          type:
+                            doc.result.result.type ||
+                            'application/octet-stream',
+                          name: doc.result.result.title || 'Unknown File',
+                          fileCopyUri: null,
+                          size: 0,
+                          source: 'server' as const,
+                        };
+                      });
+
+                    console.log('Formatted files:', formattedFiles);
+                    if (formattedFiles.length > 0) {
+                      setSelectedFiles(formattedFiles);
+                      // Also update Formik files array
+                      if (formikRef.current) {
+                        formikRef.current.setFieldValue(
+                          'files',
+                          financialData.files,
+                        );
+                      }
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error processing documents:', error);
+                }
+              }
             }
           }
-        }
-        // Gọi API getDocuments
-        const documents = await getDocuments();
-        console.log('Documents from API:', documents);
-        if (documents && documents.length > 0) {
-          const formattedFiles: ExtendedDocumentPickerResponse[] =
-            documents.map((doc: UploadResponse) => ({
-              uri: doc.result.url || '', // Đường dẫn đến file
-              type: doc.result.type || 'application/octet-stream',
-              name: doc.result.title || 'Unknown File',
-              fileCopyUri: null, // Default value for fileCopyUri
-              size: 0, // Default value for size
-              source: 'server', // Đánh dấu file từ server
-            }));
-
-          setSelectedFiles(formattedFiles);
         }
       } catch (error) {
         console.error('Error fetching workflow:', error);
@@ -463,7 +497,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     };
 
     fetchData();
-  }, [appId, status]);
+  }, [appId]);
 
   return (
     <Formik

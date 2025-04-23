@@ -173,6 +173,27 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     },
   ];
 
+  const repaymentMethods = [
+    {
+      value: 'EQUAL_INSTALLMENTS',
+      label:
+        currentLanguage === 'vi' ? 'Trả đều gốc và lãi' : 'Equal Installments',
+    },
+    {
+      value: 'EQUAL_PRINCIPAL',
+      label: currentLanguage === 'vi' ? 'Trả đều gốc' : 'Equal Principal',
+    },
+    {
+      value: 'INTEREST_ONLY',
+      label: currentLanguage === 'vi' ? 'Chỉ trả lãi' : 'Interest Only',
+    },
+    {
+      value: 'BULLET_PAYMENT',
+      label:
+        currentLanguage === 'vi' ? 'Trả một lần cuối kỳ' : 'Bullet Payment',
+    },
+  ];
+
   const defaultTerms = useMemo(
     () => [
       {
@@ -193,7 +214,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     loanCollateralTypes: [],
     note: '',
     monthlyIncome: 0,
-    repaymentMethod: '', //*
+    repaymentMethod: 'EQUAL_INSTALLMENTS',
     interestType: 'FIXED',
     loanTerm: 12,
     interestRate: 0,
@@ -208,15 +229,74 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     undefined,
   );
 
-  // Removed duplicate declaration of loanTerms
+  const {
+    data: interestRates,
+    isLoading: isLoadingRates,
+    error,
+    status: queryStatus, // Add status to check query state
+  } = useQuery<InterestRate[]>({
+    queryKey: ['interestRates'],
+    queryFn: async () => {
+      console.log('⏳ Starting interest rates fetch...');
+      try {
+        const response = await fetchInterestRates();
+        console.log('✅ Interest rates fetched:', response);
+        console.log('📊 Number of rates:', response?.length || 0);
+        return response;
+      } catch (err) {
+        console.error('❌ Error fetching rates:', err);
+        throw err;
+      }
+    },
+    retry: 3,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const loanTerms = useMemo(() => {
+    // Log current query state
+    console.log('🔄 Query Status:', queryStatus);
+    console.log('⌛ Loading:', isLoadingRates);
+    console.log('❌ Error:', error);
+
+    // Handle loading state
+    if (isLoadingRates) {
+      console.log('⏳ Loading interest rates...');
+      return defaultTerms;
+    }
+
+    // Handle error state
+    if (error) {
+      console.error('❌ Error loading interest rates:', error);
+      return defaultTerms;
+    }
+
+    // Handle success state
+    if (queryStatus === 'success' && Array.isArray(interestRates)) {
+      console.log('✅ Mapping interest rates to loan terms');
+      return interestRates.map(rate => ({
+        value: rate.term,
+        label:
+          currentLanguage === 'vi'
+            ? `${rate.term} tháng`
+            : `${rate.term} months`,
+        interest: rate.rate,
+      }));
+    }
+
+    // Fallback to default terms
+    console.log('⚠️ Using default terms');
+    return defaultTerms;
+  }, [
+    interestRates,
+    currentLanguage,
+    defaultTerms,
+    isLoadingRates,
+    error,
+    queryStatus,
+  ]);
 
   useEffect(() => {
     const fetchData = async () => {
-      // Tìm giá trị interest tương ứng với loanTerm
-      const selectedTerm = loanTerms.find(
-        term => term.value === formData.loanTerm,
-      );
-      setSelectedInterest(selectedTerm?.interest || undefined);
       // Add loanTerms to the dependency array
       try {
         const data = await getworkflowbyapplicationid<CreateLoanResponse>(
@@ -226,7 +306,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           const createLoanStep = data.result.steps.find(
             step => step.name === 'create-loan-request',
           );
-          console.log('id:', createLoanStep?.transactionId);
+
           setTransactionId(createLoanStep?.transactionId ?? '');
           const lastValidHistory = Array.isArray(
             createLoanStep?.metadata?.histories,
@@ -241,7 +321,10 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           setFormData(prev => {
             const metadata =
               lastValidHistory?.response.approvalProcessResponse?.metadata;
-
+            // Nếu form đã có dữ liệu, giữ nguyên
+            if (prev.amount > 0 || prev.purpose) {
+              return prev;
+            }
             return {
               ...prev,
               // Basic loan information
@@ -251,10 +334,10 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
               // Customer and security information
               borrowerType:
                 (metadata?.borrowerType as BorrowerType) ||
-                ('INDIVIDUAL' as BorrowerType),
+                ('' as BorrowerType),
               loanSecurityType:
                 (metadata?.loanSecurityType as LoanSecurityType) ||
-                ('UNSECURED' as LoanSecurityType),
+                ('' as LoanSecurityType),
               loanCollateralTypes:
                 (metadata?.loanCollateralTypes as LoanCollateralType[]) || [],
 
@@ -264,7 +347,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
               // Loan terms and conditions
               interestType:
                 (metadata?.interestType as InterestType) ||
-                ('FIXED' as InterestType),
+                ('' as InterestType),
               loanTerm: metadata?.loanTerm || 12,
               interestRate: metadata?.interestRate || 0,
               repaymentMethod: metadata?.repaymentMethod || '',
@@ -286,8 +369,13 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     };
 
     fetchData();
-  }, [appId, formData.loanTerm, loanTerms]);
-
+  }, [appId]);
+  useEffect(() => {
+    const selectedTerm = loanTerms.find(
+      term => term.value === formData.loanTerm,
+    );
+    setSelectedInterest(selectedTerm?.interest || undefined);
+  }, [formData.loanTerm, loanTerms]);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOpen, setIsOpen] = useState(false);
@@ -404,6 +492,11 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       setIsLoading(true);
 
       const loanData = {
+        monthlyIncome: formData.monthlyIncome,
+        repaymentMethod: formData.repaymentMethod,
+        interestType: formData.interestType,
+        loanTerm: formData.loanTerm,
+        interestRate: selectedInterest,
         purpose: formData.purpose,
         amount: formData.amount,
         borrowerType: formData.borrowerType,
@@ -420,8 +513,8 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
         const response = await loanRequest(appId, loanData);
         console.log('Create loan request ngoài' + response.result.id);
         console.log('Loan request response:', response);
-        if (response) {
-          navigation.replace('CreateLoanPlan', {appId});
+        if (response.code === 201) {
+          navigation.replace('CreateFinancialInfo', {appId});
         }
       } else {
         const response = await updateLoanRequest(
@@ -430,13 +523,13 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           transactionId || '',
         );
         console.log('Loan request response:', response);
-        if (response) {
-          navigation.replace('InfoCreateLoan', {appId});
+        if (response.code === 200) {
           navigation.goBack();
         }
       }
-    } catch (error: any) {
-      console.log('Error creating loan request:', error.response);
+    } catch (err) {
+      // Changed from error to err
+      console.log('Error creating loan request:', err.response);
       Alert.alert(
         currentLanguage === 'vi' ? 'Lỗi' : 'Error',
         currentLanguage === 'vi'
@@ -448,71 +541,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     }
   };
 
-  const {
-    data: interestRates,
-    isLoading: isLoadingRates,
-    error,
-    status: queryStatus, // Add status to check query state
-  } = useQuery<InterestRate[]>({
-    queryKey: ['interestRates'],
-    queryFn: async () => {
-      console.log('⏳ Starting interest rates fetch...');
-      try {
-        const response = await fetchInterestRates();
-        console.log('✅ Interest rates fetched:', response);
-        console.log('📊 Number of rates:', response?.length || 0);
-        return response;
-      } catch (err) {
-        console.error('❌ Error fetching rates:', err);
-        throw err;
-      }
-    },
-    retry: 3,
-    staleTime: 1000 * 60 * 5,
-  });
   // 4. Add logging in useMemo
-  const loanTerms = useMemo(() => {
-    // Log current query state
-    console.log('🔄 Query Status:', queryStatus);
-    console.log('⌛ Loading:', isLoadingRates);
-    console.log('❌ Error:', error);
-
-    // Handle loading state
-    if (isLoadingRates) {
-      console.log('⏳ Loading interest rates...');
-      return defaultTerms;
-    }
-
-    // Handle error state
-    if (error) {
-      console.error('❌ Error loading interest rates:', error);
-      return defaultTerms;
-    }
-
-    // Handle success state
-    if (queryStatus === 'success' && Array.isArray(interestRates)) {
-      console.log('✅ Mapping interest rates to loan terms');
-      return interestRates.map(rate => ({
-        value: rate.term,
-        label:
-          currentLanguage === 'vi'
-            ? `${rate.term} tháng`
-            : `${rate.term} months`,
-        interest: rate.rate,
-      }));
-    }
-
-    // Fallback to default terms
-    console.log('⚠️ Using default terms');
-    return defaultTerms;
-  }, [
-    interestRates,
-    currentLanguage,
-    defaultTerms,
-    isLoadingRates,
-    error,
-    queryStatus,
-  ]);
 
   const handleOnchange = (field: keyof FormData, value: any): void => {
     setFormData(prev => ({
@@ -820,14 +849,17 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           <Text style={styles.headingTitle}>
             {currentLanguage === 'vi' ? 'Kế hoạch trả nợ' : 'Repayment Plan'}
           </Text>
-          <InputBackground
-            placeholder={
-              currentLanguage === 'vi' ? 'Nhập kế hoạch' : 'Enter plan'
-            }
-            onChangeText={(value: string) =>
-              handleOnchange('repaymentMethod', value)
-            }
+          <DropdownComponent
             value={formData.repaymentMethod}
+            data={repaymentMethods}
+            placeholder={
+              currentLanguage === 'vi'
+                ? 'Chọn kế hoạch trả nợ'
+                : 'Select repayment plan'
+            }
+            onChange={(value: TargetItem) =>
+              handleOnchange('repaymentMethod', value.value)
+            }
           />
           {errors.repaymentMethod && (
             <Text style={styles.errorText}>{errors.repaymentMethod}</Text>

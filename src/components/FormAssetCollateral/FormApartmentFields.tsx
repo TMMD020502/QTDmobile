@@ -32,25 +32,22 @@ import {RootStackParamList} from '../../navigators/RootNavigator';
 import {
   ApartmentFormData,
   ApiErrorResponse,
+  OwnerInfo,
   OwnershipType,
 } from '../../api/types/addAssets';
 import {useTranslation} from 'react-i18next';
 import {useRoute} from '@react-navigation/native';
 import {Apartment, History} from '../../api/types/loanworkflowtypes';
-import {AppIcons} from '../../icons';
 import {getDocuments, uploadImage} from '../../api/services/uploadImage';
 import DocumentPicker, {
   DocumentPickerResponse,
 } from 'react-native-document-picker';
-import {
-  clearFinanciaDocumentIds,
-  getFinanciaDocumentIds,
-  saveFinanciaDocumentIds,
-} from '../../../tokenStorage';
+
 import FileViewer from 'react-native-file-viewer';
-import ImageDisplay from '../ImageDisplay/ImageDisplay';
+
 import {UploadResponse} from '../../api/types/upload';
 import DocumentUpload from '../DocumentUpload/documentupload';
+import {ApiResponse} from '../../api/axiosInstance';
 interface FormApartmentFieldsProps {
   theme: Theme;
   appId: string;
@@ -85,55 +82,58 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
   const [tempDate, setTempDate] = useState(new Date());
   //const [selectedFiles, setSelectedFiles] = useState<ExtendedDocumentPickerResponse[]>([]);
   const {t} = useTranslation();
+  const [transactionId, setTransactionId] = useState<string>();
   const [formData, setFormData] = useState<ApartmentFormData>({
     assetType: 'APARTMENT',
-    title: '',
-    ownershipType: '' as OwnershipType,
-    proposedValue: 0,
+    title: 'Villa with Land in District 1',
+    ownershipType: 'INDIVIDUAL' as OwnershipType,
+    proposedValue: 2000000000,
     documents: [],
     application: {id: appId},
-    ownerInfo: {
-      fullName: '',
-      dayOfBirth: '',
-      idCardNumber: '',
-      idIssueDate: '',
-      idIssuePlace: '',
-      permanentAddress: '',
-    },
+    ownerInfos: [
+      {
+        fullName: 'John Doe',
+        dayOfBirth: '1980-01-01T00:00:00Z',
+        idCardNumber: '123456789012',
+        idIssueDate: '2022-01-01T07:00:00Z',
+        idIssuePlace: 'công an HCM',
+        permanentAddress: '123 Villa Street, District 1',
+      },
+    ],
     transferInfo: {
-      fullName: '',
-      dayOfBirth: '',
-      idCardNumber: '',
-      idIssueDate: '',
-      idIssuePlace: '',
-      permanentAddress: '',
-      transferDate: '',
-      transferRecordNumber: '',
+      fullName: 'Previous Owner',
+      dayOfBirth: '1975-01-01T00:00:00Z',
+      idCardNumber: '987654321012',
+      idIssueDate: '2022-01-01T07:00:00Z',
+      idIssuePlace: 'công an HCM',
+      permanentAddress: '456 Old Street, District 2',
+      transferDate: '2022-01-01T00:00:00Z',
+      transferRecordNumber: 'TR001',
     },
     apartment: {
-      plotNumber: '',
-      mapNumber: '',
-      address: '',
-      area: 0,
-      purpose: '',
-      name: '',
-      floorArea: 0,
-      typeOfHousing: '',
-      typeOfOwnership: '',
-      ownershipTerm: '',
-      notes: '',
-      sharedFacilities: '',
-      certificateNumber: '',
-      certificateBookNumber: '',
-      issuingAuthority: '',
-      issueDate: '',
-      expirationDate: '',
-      originOfUsage: '',
+      plotNumber: 'PLT001',
+      mapNumber: 'MAP001',
+      address: '123 Villa Street, District 1',
+      area: 500.0,
+      purpose: 'Để ở',
+      name: 'Trần Minh Minh Đức',
+      floorArea: 300.0,
+      typeOfHousing: 'Villa',
+      typeOfOwnership: 'Permanent',
+      ownershipTerm: '2050-12-31T00:00:00Z',
+      notes: 'Modern villa with swimming pool',
+      sharedFacilities: 'Swimming pool, garden, security',
+      certificateNumber: 'CERT001',
+      certificateBookNumber: 'BOOK001',
+      issuingAuthority: 'Land Department',
+      issueDate: '2022-01-01T00:00:00Z',
+      expirationDate: '2050-12-31T00:00:00Z',
+      originOfUsage: 'Purchase',
       metadata: {
-        parkingSpace: '',
-        floor: 0,
-        view: '',
-        renovationStatus: '',
+        parkingSpace: 'B1-123',
+        floor: 15,
+        view: 'City view',
+        renovationStatus: 'Newly renovated',
       },
     },
   });
@@ -191,12 +191,6 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
       console.log('📌 Id:', uploadResponse.id);
 
       setSelectedFiles(prev => [...prev, File]);
-      // Lấy danh sách id hiện tại từ AsyncStorage
-      const existingIds = (await getFinanciaDocumentIds()) || [];
-
-      // Thêm id mới vào danh sách
-      const updatedIds = [...existingIds, uploadResponse.id ?? ''];
-      await saveFinanciaDocumentIds(updatedIds);
       setFormData(prev => ({
         ...prev,
         documents: [...prev.documents, uploadResponse.id ?? ''],
@@ -214,7 +208,6 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
     }));
 
     // Clear saved document IDs from storage
-    clearFinanciaDocumentIds();
   };
 
   useEffect(() => {
@@ -225,6 +218,12 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
           const createLoanStep = data.result.steps.find(
             step => step.name === 'add-asset-collateral',
           );
+          setTransactionId(createLoanStep?.transactionId ?? '');
+          // Check if there's existing data
+          if (formData.title || formData.proposedValue > 0) {
+            console.log('Existing data found, skipping update');
+            return; // Skip updating if there's existing data
+          }
           const lastValidHistory = Array.isArray(
             createLoanStep?.metadata?.histories,
           )
@@ -248,26 +247,30 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
             documents:
               lastValidHistory?.response.approvalProcessResponse?.metadata[0]
                 ?.documents || [],
-            ownerInfo: {
-              fullName:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.ownerInfo?.fullName || '',
-              dayOfBirth:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.ownerInfo?.dayOfBirth || '2023-01-01T00:00:00Z',
-              idCardNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.ownerInfo?.idCardNumber || '',
-              idIssueDate:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.ownerInfo?.idIssueDate || '2023-01-01T00:00:00Z',
-              idIssuePlace:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.ownerInfo?.idIssuePlace || '',
-              permanentAddress:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.ownerInfo?.permanentAddress || '',
-            },
+            ownerInfos: [
+              {
+                fullName:
+                  lastValidHistory?.response.approvalProcessResponse
+                    ?.metadata[0]?.ownerInfos?.fullName || '',
+                dayOfBirth:
+                  lastValidHistory?.response.approvalProcessResponse
+                    ?.metadata[0]?.ownerInfos?.dayOfBirth ||
+                  '2023-01-01T00:00:00Z',
+                idCardNumber:
+                  lastValidHistory?.response.approvalProcessResponse
+                    ?.metadata[0]?.ownerInfos?.idCardNumber || '',
+                idIssueDate:
+                  lastValidHistory?.response.approvalProcessResponse
+                    ?.metadata[0]?.ownerInfos?.idIssueDate ||
+                  '2023-01-01T00:00:00Z',
+                idIssuePlace:
+                  lastValidHistory?.response.approvalProcessResponse
+                    ?.metadata[0]?.ownerInfos?.idIssuePlace || '',
+                permanentAddress:
+                  lastValidHistory?.response.approvalProcessResponse
+                    ?.metadata[0]?.ownerInfos?.permanentAddress || '',
+              },
+            ],
             transferInfo: {
               fullName:
                 lastValidHistory?.response.approvalProcessResponse?.metadata[0]
@@ -367,30 +370,58 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
             },
             application: {id: appId},
           }));
-        } // Gọi API getDocuments
-        const documents = await getDocuments();
-        console.log('Documents from API:', documents);
-        if (documents && documents.length > 0) {
-          const formattedFiles: ExtendedDocumentPickerResponse[] =
-            documents.map((doc: UploadResponse) => ({
-              uri: doc.result.url || '', // Đường dẫn đến file
-              type: doc.result.type || 'application/octet-stream',
-              name: doc.result.title || 'Unknown File',
-              fileCopyUri: null, // Default value for fileCopyUri
-              size: 0, // Default value for size
-              source: 'server', // Đánh dấu file từ server
-            }));
+          // Thêm kiểm tra lastValidHistory có tồn tại và có files không
+          if (lastValidHistory?.files && lastValidHistory.files.length > 0) {
+            try {
+              console.log('Files to fetch:', lastValidHistory.files);
+              const documents = await getDocuments(lastValidHistory.files);
+              console.log('Raw documents response:', documents);
 
-          setSelectedFiles(formattedFiles);
-          setDocumentIds(formattedFiles.map(f => f.uri));
-        }
+              if (Array.isArray(documents) && documents.length > 0) {
+                const formattedFiles = documents
+                  .filter((doc: ApiResponse<UploadResponse>) => {
+                    // Thêm log để debug
+                    console.log('Checking doc:', doc);
+                    return doc && doc.result;
+                  })
+                  .map((doc: ApiResponse<UploadResponse>) => {
+                    // Thêm log để debug
+                    console.log('Mapping doc:', doc);
+                    return {
+                      uri: doc.result.result.url || '',
+                      type:
+                        doc.result.result.type || 'application/octet-stream',
+                      name: doc.result.result.title || 'Unknown File',
+                      fileCopyUri: null,
+                      size: 0,
+                      source: 'server' as const,
+                    };
+                  });
+
+                console.log('Formatted files:', formattedFiles);
+                if (formattedFiles.length > 0) {
+                  setSelectedFiles(formattedFiles); // Đặt state
+                  setDocumentIds(formattedFiles.map(f => f.uri)); // Cập nhật documentIds
+
+                  // Cập nhật formData
+                  setFormData(prev => ({
+                    ...prev,
+                    documents: formattedFiles.map(f => f.uri),
+                  }));
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching documents:', error);
+            }
+          }
+        } // Gọi API getDocuments
       } catch (error) {
         console.error('Error fetching workflow:', error);
       }
     };
 
     fetchData();
-  }, [appId, setSelectedFiles]);
+  }, [appId, formData.title, formData.proposedValue]);
   const styles = createStyles(theme);
 
   const handleChange = (field: string, value: any) => {
@@ -418,19 +449,19 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
           },
         };
       }
-      if (field.startsWith('ownerInfo.')) {
-        // Xử lý ownerInfo ở root
-        const ownerField = field.split('.')[1];
+      if (field.startsWith('ownerInfos.')) {
+        const [_, index, fieldName] = field.split('.');
+        const ownerIndex = parseInt(index);
+
         return {
           ...prev,
-          ownerInfo: {
-            ...prev.ownerInfo,
-            [ownerField]: value,
-          },
+          ownerInfos: prev.ownerInfos.map((owner, idx) =>
+            idx === ownerIndex ? {...owner, [fieldName]: value} : owner,
+          ),
         };
       }
       if (field.startsWith('transferInfo.')) {
-        // Xử lý ownerInfo ở root
+        // Xử lý ownerInfos ở root
         const transferInfo = field.split('.')[1];
         return {
           ...prev,
@@ -460,7 +491,11 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
         }
       } else {
         console.log('formData', formData);
-        const response = await updateAssetCollateral(appId, formData);
+        const response = await updateAssetCollateral(
+          appId,
+          formData,
+          transactionId || '',
+        );
         if (response && navigation) {
           navigation.replace('InfoCreateLoan', {appId});
         }
@@ -601,12 +636,16 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
     if (parts.length === 1) {
       return formData[parts[0] as keyof typeof formData];
     }
-    if (parts[0] === 'ownerInfo') {
-      // Thêm case xử lý ownerInfo
-      return formData.ownerInfo[parts[1] as keyof typeof formData.ownerInfo];
+    if (parts[0] === 'ownerInfos') {
+      const [_, index, field] = parts;
+      const ownerIndex = parseInt(index);
+      const owner = formData.ownerInfos[ownerIndex];
+
+      // Use type assertion to tell TypeScript that field is a valid key of OwnerInfo
+      return owner?.[field as keyof OwnerInfo] ?? '';
     }
     if (parts[0] === 'transferInfo') {
-      // Thêm case xử lý ownerInfo
+      // Thêm case xử lý ownerInfos
       return formData.transferInfo[
         parts[1] as keyof typeof formData.transferInfo
       ];
@@ -851,70 +890,131 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
           {/* Owner Info Fields */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin chủ sở hữu</Text>
-            {/* Thông tin cơ bản - fullName */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label}>{ownerInfoFields[0].label}</Text>
-              {renderField(
-                ownerInfoFields[0],
-                getFieldValue(`ownerInfo.${ownerInfoFields[0].field}`),
-                `ownerInfo.${ownerInfoFields[0].field}`,
-              )}
-            </View>
 
-            {/* Row chứa Ngày sinh và CCCD */}
-            <View style={styles.gridContainer}>
-              {/* Ngày sinh */}
-              <View style={styles.gridItemDateSmall}>
-                <Text style={styles.label}>{ownerInfoFields[1].label}</Text>
-                {renderField(
-                  ownerInfoFields[1],
-                  getFieldValue(`ownerInfo.${ownerInfoFields[1].field}`),
-                  `ownerInfo.${ownerInfoFields[1].field}`,
+            {formData.ownerInfos.map((owner, ownerIndex) => (
+              <View key={ownerIndex} style={styles.ownerSection}>
+                {ownerIndex > 0 && (
+                  <Text style={styles.ownerTitle}>
+                    Chủ sở hữu {ownerIndex + 1}
+                  </Text>
+                )}
+
+                {/* Thông tin cơ bản - fullName */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>{ownerInfoFields[0].label}</Text>
+                  {renderField(
+                    ownerInfoFields[0],
+                    getFieldValue(
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[0].field}`,
+                    ),
+                    `ownerInfos.${ownerIndex}.${ownerInfoFields[0].field}`,
+                  )}
+                </View>
+
+                {/* Row chứa Ngày sinh và CCCD */}
+                <View style={styles.gridContainer}>
+                  {/* Ngày sinh */}
+                  <View style={styles.gridItemDateSmall}>
+                    <Text style={styles.label}>{ownerInfoFields[1].label}</Text>
+                    {renderField(
+                      ownerInfoFields[1],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[1].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[1].field}`,
+                    )}
+                  </View>
+
+                  {/* Số CMND/CCCD */}
+                  <View style={styles.gridItemDateLarge}>
+                    <Text style={styles.label}>{ownerInfoFields[2].label}</Text>
+                    {renderField(
+                      ownerInfoFields[2],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[2].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[2].field}`,
+                    )}
+                  </View>
+                </View>
+
+                {/* Row chứa Ngày cấp và Nơi cấp */}
+                <View style={styles.gridContainer}>
+                  {/* Nơi cấp */}
+                  <View style={styles.gridItemDateLarge}>
+                    <Text style={styles.label}>{ownerInfoFields[4].label}</Text>
+                    {renderField(
+                      ownerInfoFields[4],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[4].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[4].field}`,
+                    )}
+                  </View>
+                  {/* Ngày cấp */}
+                  <View style={styles.gridItemDateSmall}>
+                    <Text style={styles.label}>{ownerInfoFields[5].label}</Text>
+                    {renderField(
+                      ownerInfoFields[5],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[5].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[5].field}`,
+                    )}
+                  </View>
+                </View>
+
+                {/* Địa chỉ thường trú */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>{ownerInfoFields[3].label}</Text>
+                  {renderField(
+                    ownerInfoFields[3],
+                    getFieldValue(
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[3].field}`,
+                    ),
+                    `ownerInfos.${ownerIndex}.${ownerInfoFields[3].field}`,
+                  )}
+                </View>
+
+                {/* Remove Owner Button (except first owner) */}
+                {ownerIndex > 0 && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        ownerInfos: prev.ownerInfos.filter(
+                          (_, i) => i !== ownerIndex,
+                        ),
+                      }));
+                    }}>
+                    <Text style={styles.removeButtonText}>Xóa chủ sở hữu</Text>
+                  </TouchableOpacity>
                 )}
               </View>
+            ))}
 
-              {/* Số CMND/CCCD */}
-              <View style={styles.gridItemDateLarge}>
-                <Text style={styles.label}>{ownerInfoFields[2].label}</Text>
-                {renderField(
-                  ownerInfoFields[2],
-                  getFieldValue(`ownerInfo.${ownerInfoFields[2].field}`),
-                  `ownerInfo.${ownerInfoFields[2].field}`,
-                )}
-              </View>
-            </View>
-
-            {/* Row chứa Ngày cấp và Nơi cấp */}
-            <View style={styles.gridContainer}>
-              {/* Nơi cấp */}
-              <View style={styles.gridItemDateLarge}>
-                <Text style={styles.label}>{ownerInfoFields[4].label}</Text>
-                {renderField(
-                  ownerInfoFields[4],
-                  getFieldValue(`ownerInfo.${ownerInfoFields[4].field}`),
-                  `ownerInfo.${ownerInfoFields[4].field}`,
-                )}
-              </View>
-              {/* Ngày cấp */}
-              <View style={styles.gridItemDateSmall}>
-                <Text style={styles.label}>{ownerInfoFields[5].label}</Text>
-                {renderField(
-                  ownerInfoFields[5],
-                  getFieldValue(`ownerInfo.${ownerInfoFields[5].field}`),
-                  `ownerInfo.${ownerInfoFields[5].field}`,
-                )}
-              </View>
-            </View>
-
-            {/* Địa chỉ thường trú */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label}>{ownerInfoFields[3].label}</Text>
-              {renderField(
-                ownerInfoFields[3],
-                getFieldValue(`ownerInfo.${ownerInfoFields[3].field}`),
-                `ownerInfo.${ownerInfoFields[3].field}`,
-              )}
-            </View>
+            {/* Add Owner Button */}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  ownerInfos: [
+                    ...prev.ownerInfos,
+                    {
+                      fullName: '',
+                      dayOfBirth: '2023-01-01T00:00:00Z',
+                      idCardNumber: '',
+                      idIssueDate: '2023-01-01T00:00:00Z',
+                      idIssuePlace: '',
+                      permanentAddress: '',
+                    },
+                  ],
+                }));
+              }}>
+              <Text style={styles.addButtonText}>Thêm chủ sở hữu</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Apartment Metadata */}
@@ -1068,7 +1168,6 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
             </View>
           </View>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tài liệu đính kèm</Text>
             <DocumentUpload
               theme={theme}
               selectedFiles={selectedFiles}

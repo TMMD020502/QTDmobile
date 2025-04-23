@@ -4,6 +4,7 @@ export interface Application {
   updatedAt: string;
   lastModifiedBy: string;
   createdBy: string;
+  applicationCode: string | null;
   amount: number | null;
   loanProcessors: any[];
   startDate: string | null;

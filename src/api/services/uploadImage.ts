@@ -7,12 +7,10 @@ import {
   UploadErrorCode,
   UploadRequest,
 } from '../types/upload';
-import i18n from '../../../i18n';
-import {DocumentPickerResponse} from 'react-native-document-picker';
-import {getFinanciaDocumentIds} from '../../../tokenStorage';
+
 import {AxiosError} from 'axios';
 import {encode} from 'base64-arraybuffer';
-const currentLanguage = i18n.language;
+
 export class UploadError extends Error {
   constructor(message: string, public code?: number) {
     super(message);
@@ -131,72 +129,44 @@ export const uploadImage = async (file: UploadFile): Promise<UploadRequest> => {
   }
 };
 
-export const getDocuments = async (): Promise<UploadResponse[]> => {
+export const getDocuments = async (
+  documentIds: string[],
+): Promise<ApiResponse<UploadResponse>[]> => {
+  // Thay đổi return type
+  console.log('duyệt qua ', documentIds);
   try {
-    // Lấy danh sách document IDs từ storage
-    const documentIds = await getFinanciaDocumentIds();
-    console.log('Document IDs:', documentIds);
+    console.log('📄 Bắt đầu gọi tài liệu với các ID:', documentIds);
 
-    if (documentIds && documentIds.length > 0) {
-      // Lặp qua từng documentId và gọi API riêng lẻ
-      const documentPromises = documentIds.map(async documentId => {
-        try {
-          const response = await axiosInstance.get(`/documents/${documentId}`);
-          console.log(
-            `API Response for documentId ${documentId}:`,
-            response.data,
-          );
-          console.log('Response for document' + response.data.result.url);
-          return response.data;
-        } catch (error: any) {
-          console.error(`Lỗi khi gọi API cho documentId ${documentId}:`, error);
-          return null; // Trả về null nếu có lỗi cho documentId này
-        }
-      });
-
-      // Chờ tất cả các yêu cầu hoàn thành
-      const documents = await Promise.all(documentPromises);
-
-      // Lọc ra các kết quả hợp lệ (loại bỏ null)
-      const validDocuments = documents.filter(doc => doc !== null);
-
-      if (validDocuments.length === 0) {
-        throw new Error('Không nhận được tài liệu hợp lệ từ server');
-      }
-
-      return validDocuments as UploadResponse[];
-    }
-
-    // Return an empty array if documentIds is empty or undefined
-    return [];
-  } catch (error: any) {
-    if (error.response) {
-      // Xử lý lỗi từ phía server (4xx, 5xx)
-      console.error(
-        'Lỗi từ server:',
-        error.response.status,
-        error.response.data,
-      );
-
-      // Hiển thị thông báo lỗi cho người dùng
-      Alert.alert(
-        'Lỗi',
-        `Không thể tải tài liệu: ${
-          error.response.data?.message || 'Vui lòng thử lại'
-        }`,
-      );
-
-      // Trả về giá trị mặc định
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      console.log('⚠️ Không có ID nào được cung cấp');
       return [];
     }
 
-    if (error.message) {
-      // Xử lý lỗi không liên quan đến server
-      console.error('Lỗi:', error.message);
-      Alert.alert('Lỗi', error.message);
+    const results: ApiResponse<UploadResponse>[] = []; // Thay đổi type của results
+
+    for (const documentId of documentIds) {
+      try {
+        const response = await axiosInstance.get<ApiResponse<UploadResponse>>(
+          `/documents/${documentId}`,
+        );
+        console.log(`✅ Đã lấy tài liệu ${documentId}:`, response.data);
+
+        if (response.data) {
+          results.push(response.data); // Thay đổi ở đây
+        } else {
+          console.warn(`⚠️ Tài liệu ${documentId} không có dữ liệu`);
+        }
+      } catch (error: any) {
+        console.error(`❌ Lỗi khi gọi tài liệu ${documentId}:`, error.message);
+        continue;
+      }
     }
 
-    // Trả về giá trị mặc định nếu có lỗi
+    console.log('📦 Tài liệu hợp lệ:', results);
+    return results;
+  } catch (error: any) {
+    console.error('❌ Lỗi tổng quát trong getDocuments:', error);
+    Alert.alert('Lỗi', error.message || 'Có lỗi xảy ra khi lấy tài liệu');
     return [];
   }
 };

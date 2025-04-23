@@ -1,12 +1,5 @@
 import React, {useState} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  Modal,
-  StyleSheet,
-} from 'react-native';
+import {View, Text, TouchableOpacity, Image, Modal} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import DocumentPicker, {
   DocumentPickerResponse,

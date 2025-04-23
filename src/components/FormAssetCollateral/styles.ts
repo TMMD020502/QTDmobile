@@ -256,6 +256,13 @@ export const createStyles = (theme: Theme) =>
       backgroundColor: theme.error || '#ff4444',
       marginLeft: 8,
     },
+    removeButtonOwner: {
+      backgroundColor: theme.error,
+      padding: 12,
+      borderRadius: 8, 
+      marginTop: 16,
+      alignItems: 'center',
+    },
     removeIcon: {
       width: 16,
       height: 16,
@@ -289,5 +296,42 @@ export const createStyles = (theme: Theme) =>
       width: 16, // Kích thước icon
       height: 16,
       tintColor: 'white', // Màu icon
+    },
+    addButton: {
+      backgroundColor: theme.buttonSubmit,
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 16,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    addButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    ownerSection: {
+      marginBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderInputBackground,
+      paddingBottom: 20,
+      backgroundColor: theme.backgroundBox,
+      borderRadius: 8,
+      padding: 16,
+    },
+    ownerTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    removeButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
     },
   });

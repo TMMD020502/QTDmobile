@@ -22,13 +22,14 @@ interface BaseAsset {
   };
 }
 
-interface OwnerInfo {
+export interface OwnerInfo {
   fullName: string;
   dayOfBirth: string;
   idCardNumber: string;
   idIssueDate: string;
   idIssuePlace: string;
   permanentAddress: string;
+  [key: string]: string; // Add index signature
 }
 interface TransferInfo {
   fullName: string;
@@ -43,7 +44,7 @@ interface TransferInfo {
 // Apartment Asset
 export interface ApartmentAsset extends BaseAsset {
   assetType: 'APARTMENT';
-  ownerInfo: OwnerInfo;
+  ownerInfos: OwnerInfo[];
   transferInfo: TransferInfo;
   apartment: {
     plotNumber: string;
