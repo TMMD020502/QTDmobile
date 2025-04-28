@@ -52,7 +52,7 @@ const Privacy: React.FC<PrivacyProps> = ({navigation}) => {
       },
       footer: {
         lastUpdate: 'Cập nhật lần cuối: 15/12/2023',
-        author: 'Quỹ tín dụng nhân dân Châu Đức',
+        author: 'Quỹ tín dụng nhân dân',
       },
     },
     en: {
@@ -90,7 +90,7 @@ const Privacy: React.FC<PrivacyProps> = ({navigation}) => {
       },
       footer: {
         lastUpdate: 'Last updated: December 15, 2023',
-        author: "Chau Duc People's Credit Fund",
+        author: "People's Credit Fund",
       },
     },
   };

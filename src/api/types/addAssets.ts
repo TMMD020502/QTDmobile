@@ -20,6 +20,8 @@ interface BaseAsset {
   application: {
     id: string;
   };
+  ownerInfos: OwnerInfo[];
+  transferInfo: TransferInfo;
 }
 
 export interface OwnerInfo {
@@ -44,8 +46,7 @@ interface TransferInfo {
 // Apartment Asset
 export interface ApartmentAsset extends BaseAsset {
   assetType: 'APARTMENT';
-  ownerInfos: OwnerInfo[];
-  transferInfo: TransferInfo;
+
   apartment: {
     plotNumber: string;
     mapNumber: string;
@@ -77,8 +78,6 @@ export interface ApartmentAsset extends BaseAsset {
 // Land Asset
 export interface LandAsset extends BaseAsset {
   assetType: 'LAND';
-  ownerInfo: OwnerInfo;
-  transferInfo: TransferInfo;
   landAsset: {
     plotNumber: string;
     mapNumber: string;
@@ -207,13 +206,6 @@ export interface LandAndImprovementAsset extends BaseAsset {
     certificateBookNumber: string;
     issuingAuthority: string;
     issueDate: string;
-    ownerInfo: {
-      fullName: string;
-      dayOfBirth: string;
-      idCardNumber: string;
-      permanentAddress: string;
-    };
-    transferInfo: TransferInfo;
     metadata: {
       constructionPermit: string;
       lastRenovation: string;
@@ -252,8 +244,15 @@ export interface OtherAssetMetadata {
   storage: Storage;
 }
 
-export interface OtherAsset extends BaseAsset {
-  assetType: 'OTHER';
+export interface OtherAsset  {
+  assetType: 'OTHER' | string;
+  title: string;
+  ownershipType: OwnershipType; 
+  proposedValue: number;
+  documents: string[]; 
+  application: {
+    id: string;
+  };
   otherAsset: {
     metadata: OtherAssetMetadata;
   };

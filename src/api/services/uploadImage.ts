@@ -6,6 +6,7 @@ import {
   UploadResponse,
   UploadErrorCode,
   UploadRequest,
+  UploadResponseResult,
 } from '../types/upload';
 
 import {AxiosError} from 'axios';
@@ -131,7 +132,7 @@ export const uploadImage = async (file: UploadFile): Promise<UploadRequest> => {
 
 export const getDocuments = async (
   documentIds: string[],
-): Promise<ApiResponse<UploadResponse>[]> => {
+): Promise<ApiResponse<UploadResponseResult>[]> => {
   // Thay đổi return type
   console.log('duyệt qua ', documentIds);
   try {
@@ -142,11 +143,11 @@ export const getDocuments = async (
       return [];
     }
 
-    const results: ApiResponse<UploadResponse>[] = []; // Thay đổi type của results
+    const results: ApiResponse<UploadResponseResult>[] = []; // Thay đổi type của results
 
     for (const documentId of documentIds) {
       try {
-        const response = await axiosInstance.get<ApiResponse<UploadResponse>>(
+        const response = await axiosInstance.get<ApiResponse<UploadResponseResult>>(
           `/documents/${documentId}`,
         );
         console.log(`✅ Đã lấy tài liệu ${documentId}:`, response.data);

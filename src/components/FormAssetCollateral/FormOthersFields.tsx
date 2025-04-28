@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,11 @@ import {
   ScrollView,
 } from 'react-native';
 import InputBackground from '../InputBackground/InputBackground';
-import {addAssetCollateral} from '../../api/services/loan';
+import {
+  addAssetCollateral,
+  getworkflowbyapplicationid,
+  updateAssetCollateral,
+} from '../../api/services/loan';
 import {
   commonFields,
   otherAssetFields,
@@ -17,21 +21,45 @@ import {
 } from './formFields';
 import {createStyles} from './styles';
 import {Theme} from '../../theme/colors';
-import {ArtPiece} from '../../api/types/addAssets';
+import {ArtPiece, OtherAsset, OwnershipType} from '../../api/types/addAssets';
+import {DocumentPickerResponse} from 'react-native-document-picker';
+import {useRoute} from '@react-navigation/native';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {RootStackParamList} from '../../navigators/RootNavigator';
+import {getDocuments} from '../../api/services/uploadImage';
+import {History} from '../../api/types/loanworkflowtypes';
+import DocumentUpload from '../DocumentUpload/documentupload';
 
 interface FormOthersFieldsProps {
   theme: Theme;
   appId: string;
+  status?: string;
+  fromScreen?: string;
   onSuccess: () => void;
+  navigation: StackNavigationProp<RootStackParamList>;
+}
+
+interface ExtendedDocumentPickerResponse extends DocumentPickerResponse {
+  source: 'local' | 'server';
 }
 
 const FormOthersFields: React.FC<FormOthersFieldsProps> = ({
   theme,
-  appId,
   onSuccess,
+  navigation,
 }) => {
+  const route = useRoute();
+  const {appId, fromScreen, status} = route.params as {
+    appId: string;
+    fromScreen?: string;
+    status?: string;
+  };
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [transactionId, setTransactionId] = useState<string>();
+  const [selectedFiles, setSelectedFiles] = useState<
+    ExtendedDocumentPickerResponse[]
+  >([]);
+  const [formData, setFormData] = useState<OtherAsset>({
     assetType: 'OTHER',
     title: '',
     ownershipType: 'INDIVIDUAL',
@@ -64,6 +92,101 @@ const FormOthersFields: React.FC<FormOthersFieldsProps> = ({
       },
     },
   });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getworkflowbyapplicationid<OtherAsset>(appId);
+        if (data.result) {
+          const createLoanStep = data.result.steps.find(
+            step => step.name === 'add-asset-collateral',
+          );
+          setTransactionId(createLoanStep?.transactionId ?? '');
+
+          const lastValidHistory = Array.isArray(
+            createLoanStep?.metadata?.histories,
+          )
+            ? createLoanStep?.metadata?.histories
+                ?.filter((history: History<OtherAsset>) => !history?.error)
+                .at(-1)
+            : null;
+
+          const metadata =
+            lastValidHistory?.response.approvalProcessResponse?.metadata[0];
+
+          if (metadata) {
+            setFormData(prev => ({
+              ...prev,
+              assetType: 'OTHER',
+              title: metadata?.title || '',
+              ownershipType:
+                (metadata?.ownershipType as OwnershipType) || 'INDIVIDUAL',
+              proposedValue: metadata?.proposedValue || 0,
+              documents: metadata?.documents || [],
+              otherAsset: {
+                metadata: {
+                  assetType: metadata?.otherAsset?.metadata?.assetType || '',
+                  location: metadata?.otherAsset?.metadata?.location || '',
+                  pieces: (metadata?.otherAsset?.metadata?.pieces || []).map(
+                    (piece: ArtPiece) => ({
+                      name: piece?.name || '',
+                      artist: piece?.artist || '',
+                      year: piece?.year || 0,
+                      medium: piece?.medium || '',
+                      dimensions: piece?.dimensions || '',
+                      value: piece?.value || 0,
+                    }),
+                  ),
+                  insurance: {
+                    provider:
+                      metadata?.otherAsset?.metadata?.insurance?.provider || '',
+                    policyNumber:
+                      metadata?.otherAsset?.metadata?.insurance?.policyNumber ||
+                      '',
+                    coverage:
+                      metadata?.otherAsset?.metadata?.insurance?.coverage || 0,
+                  },
+                  storage: {
+                    location:
+                      metadata?.otherAsset?.metadata?.storage?.location || '',
+                    security:
+                      metadata?.otherAsset?.metadata?.storage?.security || '',
+                  },
+                },
+              },
+              application: {id: appId},
+            }));
+          }
+
+          if (metadata?.documents?.length > 0) {
+            try {
+              const documents = await getDocuments(metadata?.documents);
+              const formattedFiles = documents
+                .filter(doc => doc)
+                .map(doc => ({
+                  uri: doc.result.url || '',
+                  type: doc.result.type || 'application/octet-stream',
+                  name: doc.result.title || 'Unknown File',
+                  fileCopyUri: null,
+                  size: 0,
+                  source: 'server' as const,
+                }));
+
+              if (formattedFiles.length > 0) {
+                setSelectedFiles(formattedFiles);
+              }
+            } catch (error) {
+              console.error('Error fetching documents:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching workflow:', error);
+      }
+    };
+
+    fetchData();
+  }, [appId]);
 
   const styles = createStyles(theme);
 
@@ -106,10 +229,28 @@ const FormOthersFields: React.FC<FormOthersFieldsProps> = ({
     });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (_actionType: 'next' | 'update') => {
     try {
       setIsLoading(true);
-      await addAssetCollateral(appId, formData);
+      if (_actionType === 'next') {
+        const response = await addAssetCollateral(appId, formData);
+
+        // Navigate to CreditRating with the appId
+        if (response) {
+          navigation.replace('InfoCreateLoan', {appId});
+        }
+      } else {
+        console.log('formData', JSON.stringify(formData, null, 2));
+
+        const response = await updateAssetCollateral(
+          appId,
+          formData,
+          transactionId || '',
+        );
+        if (response && navigation) {
+          navigation.replace('InfoCreateLoan', {appId});
+        }
+      }
       onSuccess();
     } catch (error) {
       console.error(error);
@@ -278,18 +419,54 @@ const FormOthersFields: React.FC<FormOthersFieldsProps> = ({
           </View>
         ))}
       </View>
-
+      <View style={styles.section}>
+        <DocumentUpload
+          theme={theme}
+          selectedFiles={selectedFiles}
+          onFilesChange={files => {
+            setSelectedFiles(files);
+            // Cập nhật formData.documents khi files thay đổi
+            setFormData(prev => ({
+              ...prev,
+              documents: files.map(f => f.uri),
+              documentIds: files.map(f => f.uri),
+            }));
+          }}
+          onDocumentIdsChange={ids => {
+            //setDocumentIds(ids);
+            // Cập nhật formData.documents khi ids thay đổi
+            setFormData(prev => ({
+              ...prev,
+              documents: ids,
+              documentIds: ids,
+            }));
+          }}
+        />
+      </View>
       {/* Submit Button */}
-      <TouchableOpacity
-        style={styles.submitButton}
-        onPress={handleSubmit}
-        disabled={isLoading}>
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Tiếp tục</Text>
-        )}
-      </TouchableOpacity>
+      {status === 'completed' ? null : fromScreen === 'InfoCreateLoan' ? (
+        <TouchableOpacity
+          style={[styles.submitButton, isLoading && {opacity: 0.7}]}
+          onPress={() => handleSubmit('update')}
+          disabled={isLoading}>
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Cập nhật</Text>
+          )}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.submitButton, isLoading && {opacity: 0.7}]}
+          onPress={() => handleSubmit('next')}
+          disabled={isLoading}>
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Tiếp tục</Text>
+          )}
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 };

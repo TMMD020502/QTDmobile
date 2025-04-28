@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,11 @@ import InputBackground from '../InputBackground/InputBackground';
 import CurrencyInput from '../CurrencyInput/CurrencyInput';
 import DatePicker from '../DatePicker/DatePicker';
 import {formatDate} from '../../utils/dateUtils';
-import {addAssetCollateral} from '../../api/services/loan';
+import {
+  addAssetCollateral,
+  getworkflowbyapplicationid,
+  updateAssetCollateral,
+} from '../../api/services/loan';
 import {
   landFields,
   commonFields,
@@ -23,57 +27,192 @@ import {createStyles} from './styles';
 import {Theme} from '../../theme/colors';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../navigators/RootNavigator';
-import {ApiErrorResponse, LandFormData} from '../../api/types/addAssets';
+import {
+  ApiErrorResponse,
+  LandFormData,
+  OwnerInfo,
+  OwnershipType,
+} from '../../api/types/addAssets';
+import {useRoute} from '@react-navigation/native';
+import {DocumentPickerResponse} from 'react-native-document-picker';
+import {History} from '../../api/types/loanworkflowtypes';
+import {getDocuments} from '../../api/services/uploadImage';
+import DocumentUpload from '../DocumentUpload/documentupload';
 
 interface FormLandFieldsProps {
   theme: Theme;
   appId: string;
+  status?: string;
+  fromScreen?: string;
+  onSuccess?: () => void;
   navigation: StackNavigationProp<RootStackParamList>;
 }
 
-const FormLandFields: React.FC<FormLandFieldsProps> = ({
-  theme,
-  appId,
-  navigation,
-}) => {
+interface ExtendedDocumentPickerResponse extends DocumentPickerResponse {
+  source: 'local' | 'server';
+}
+
+const FormLandFields: React.FC<FormLandFieldsProps> = ({theme, navigation}) => {
+  const route = useRoute();
+  const {appId, fromScreen, status} = route.params as {
+    appId: string;
+    fromScreen?: string;
+    status?: string;
+  };
+  const [selectedFiles, setSelectedFiles] = useState<
+    ExtendedDocumentPickerResponse[]
+  >([]);
+  const [transactionId, setTransactionId] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<LandFormData>({
     assetType: 'LAND',
-    title: '',
+    title: 'Commercial Land Plot',
     ownershipType: 'INDIVIDUAL',
-    proposedValue: 0,
+    proposedValue: 1000000000,
     documents: [],
-    ownerInfo: {
-      fullName: '',
-      dayOfBirth: '',
-      idCardNumber: '',
-      permanentAddress: '',
-    },
+    ownerInfos: [
+      {
+        fullName: 'John Doe',
+        dayOfBirth: '1980-01-01T00:00:00Z',
+        idCardNumber: '123456789012',
+        idIssueDate: '2022-01-01T07:00:00Z',
+        idIssuePlace: 'công an HCM',
+        permanentAddress: '123 Villa Street, District 1',
+      },
+    ],
     transferInfo: {
-      fullName: '',
-      dayOfBirth: '',
-      idCardNumber: '',
-      permanentAddress: '',
-      transferDate: '',
-      transferRecordNumber: '',
+      fullName: 'Previous Owner',
+      dayOfBirth: '1975-01-01T00:00:00Z',
+      idCardNumber: '987654321012',
+      idIssueDate: '2022-01-01T07:00:00Z',
+      idIssuePlace: 'công an HCM',
+      permanentAddress: '456 Old Street, District 2',
+      transferDate: '2022-01-01T00:00:00Z',
+      transferRecordNumber: 'TR0001',
     },
     application: {id: appId},
     landAsset: {
-      plotNumber: '',
-      mapNumber: '',
-      address: '',
-      area: 0,
-      purpose: '',
-      expirationDate: '',
-      originOfUsage: '',
+      plotNumber: 'LAND001',
+      mapNumber: 'MAP003',
+      address: '789 Commercial Street, District 2',
+      area: 1000.0,
+      purpose: 'Commercial',
+      expirationDate: '2050-12-31T00:00:00Z',
+      originOfUsage: 'Purchase',
       metadata: {
-        zoning: '',
-        frontage: '',
-        landUseRights: '',
-        developmentPotential: '',
+        zoning: 'Commercial',
+        frontage: '50m',
+        landUseRights: 'Commercial development',
+        developmentPotential: 'High',
       },
     },
   });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getworkflowbyapplicationid<LandFormData>(appId);
+        if (data.result) {
+          const createLoanStep = data.result.steps.find(
+            step => step.name === 'add-asset-collateral',
+          );
+          setTransactionId(createLoanStep?.transactionId ?? '');
+
+          const lastValidHistory = Array.isArray(
+            createLoanStep?.metadata?.histories,
+          )
+            ? createLoanStep?.metadata?.histories
+                .filter((history: History<LandFormData>) => !history?.error)
+                .at(-1)
+            : null;
+
+          const metadata =
+            lastValidHistory?.response.approvalProcessResponse?.metadata[0];
+
+          if (metadata) {
+            setFormData(prev => ({
+              ...prev,
+              assetType: 'LAND',
+              title: metadata?.title || '',
+              ownershipType:
+                (metadata?.ownershipType as OwnershipType) || 'INDIVIDUAL',
+              proposedValue: metadata?.proposedValue || 0,
+              documents: metadata?.documents || [],
+              ownerInfos: (metadata?.ownerInfos || []).map(
+                (owner: OwnerInfo) => ({
+                  fullName: owner?.fullName || '',
+                  dayOfBirth: owner?.dayOfBirth || '1980-01-01T00:00:00Z',
+                  idCardNumber: owner?.idCardNumber || '',
+                  idIssueDate: owner?.idIssueDate || '2022-01-01T00:00:00Z',
+                  idIssuePlace: owner?.idIssuePlace || '',
+                  permanentAddress: owner?.permanentAddress || '',
+                }),
+              ),
+              transferInfo: {
+                fullName: metadata?.transferInfo?.fullName || '',
+                dayOfBirth:
+                  metadata?.transferInfo?.dayOfBirth || '1975-01-01T00:00:00Z',
+                idCardNumber: metadata?.transferInfo?.idCardNumber || '',
+                idIssueDate:
+                  metadata?.transferInfo?.idIssueDate || '2022-01-01T00:00:00Z',
+                idIssuePlace: metadata?.transferInfo?.idIssuePlace || '',
+                permanentAddress:
+                  metadata?.transferInfo?.permanentAddress || '',
+                transferDate:
+                  metadata?.transferInfo?.transferDate ||
+                  '2022-01-01T00:00:00Z',
+                transferRecordNumber:
+                  metadata?.transferInfo?.transferRecordNumber || '',
+              },
+              landAsset: {
+                plotNumber: metadata?.landAsset?.plotNumber || '',
+                mapNumber: metadata?.landAsset?.mapNumber || '',
+                address: metadata?.landAsset?.address || '',
+                area: metadata?.landAsset?.area || 0,
+                purpose: metadata?.landAsset?.purpose || '',
+                expirationDate: metadata?.landAsset?.expirationDate || '',
+                originOfUsage: metadata?.landAsset?.originOfUsage || '',
+                metadata: {
+                  zoning: metadata?.landAsset?.metadata?.zoning || '',
+                  frontage: metadata?.landAsset?.metadata?.frontage || '',
+                  landUseRights:
+                    metadata?.landAsset?.metadata?.landUseRights || '',
+                  developmentPotential:
+                    metadata?.landAsset?.metadata?.developmentPotential || '',
+                },
+              },
+              application: {id: appId},
+            }));
+          }
+          if (metadata?.documents?.length > 0) {
+            try {
+              const documents = await getDocuments(metadata?.documents);
+              const formattedFiles = documents
+                .filter(doc => doc)
+                .map(doc => ({
+                  uri: doc.result.url || '',
+                  type: doc.result.type || 'application/octet-stream',
+                  name: doc.result.title || 'Unknown File',
+                  fileCopyUri: null,
+                  size: 0,
+                  source: 'server' as const,
+                }));
+
+              if (formattedFiles.length > 0) {
+                setSelectedFiles(formattedFiles);
+              }
+            } catch (error) {
+              console.error('Error fetching documents:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching land asset data:', error);
+      }
+    };
+
+    fetchData();
+  }, [appId]);
 
   const [selectedDateField, setSelectedDateField] = useState<string | null>(
     null,
@@ -121,12 +260,27 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
     });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (_actionType: 'next' | 'update') => {
     try {
       setIsLoading(true);
-      const response = await addAssetCollateral(appId, formData);
-      if (response) {
-        navigation.replace('CreditRating', {appId});
+      if (_actionType === 'next') {
+        const response = await addAssetCollateral(appId, formData);
+
+        // Navigate to CreditRating with the appId
+        if (response) {
+          navigation.replace('CreditRating', {appId});
+        }
+      } else {
+        console.log('formData', JSON.stringify(formData, null, 2));
+
+        const response = await updateAssetCollateral(
+          appId,
+          formData,
+          transactionId || '',
+        );
+        if (response && navigation) {
+          navigation.replace('InfoCreateLoan', {appId});
+        }
       }
     } catch (error) {
       const apiError = error as ApiErrorResponse;
@@ -158,6 +312,47 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
   const getInputValue = (value: any): string => {
     if (value === undefined || value === null) return '';
     return String(value);
+  };
+
+  const getFieldValue = (fieldPath: string): any => {
+    const parts = fieldPath.split('.');
+
+    // Handle direct properties of formData
+    if (parts.length === 1) {
+      return formData[parts[0] as keyof typeof formData];
+    }
+    if (parts[0] === 'ownerInfos') {
+      const [_, index, field] = parts;
+      const ownerIndex = parseInt(index);
+      const owner = formData.ownerInfos[ownerIndex];
+
+      // Use type assertion to tell TypeScript that field is a valid key of OwnerInfo
+      return owner?.[field as keyof OwnerInfo] ?? '';
+    }
+    if (parts[0] === 'transferInfo') {
+      // Thêm case xử lý ownerInfos
+      return formData.transferInfo[
+        parts[1] as keyof typeof formData.transferInfo
+      ];
+    }
+    // Handle apartment properties
+    if (parts.length >= 2 && parts[0] === 'apartment') {
+      if (parts.length === 2) {
+        return formData.apartment[parts[1] as keyof typeof formData.apartment];
+      }
+
+      // Handle nested properties
+      if (parts.length === 3) {
+        const section = formData.apartment[
+          parts[1] as keyof typeof formData.apartment
+        ] as any;
+        if (section) {
+          return section[parts[2]];
+        }
+      }
+    }
+
+    return '';
   };
 
   // Utility function to format dates to required API format
@@ -333,20 +528,131 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
           {/* Owner Info Fields */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin chủ sở hữu</Text>
-            {ownerInfoFields.map(({field, label, placeholder, isDate}) => (
-              <View key={field} style={styles.fieldContainer}>
-                <Text style={styles.label}>{label}</Text>
-                {renderField(
-                  {field, label, placeholder, isDate},
-                  getInputValue(
-                    formData.landAsset.ownerInfo[
-                      field as keyof typeof formData.landAsset.ownerInfo
-                    ],
-                  ),
-                  `landAsset.ownerInfo.${field}`,
+
+            {formData.ownerInfos.map((owner, ownerIndex) => (
+              <View key={ownerIndex} style={styles.ownerSection}>
+                {ownerIndex > 0 && (
+                  <Text style={styles.ownerTitle}>
+                    Chủ sở hữu {ownerIndex + 1}
+                  </Text>
+                )}
+
+                {/* Thông tin cơ bản - fullName */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>{ownerInfoFields[0].label}</Text>
+                  {renderField(
+                    ownerInfoFields[0],
+                    getFieldValue(
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[0].field}`,
+                    ),
+                    `ownerInfos.${ownerIndex}.${ownerInfoFields[0].field}`,
+                  )}
+                </View>
+
+                {/* Row chứa Ngày sinh và CCCD */}
+                <View style={styles.gridContainer}>
+                  {/* Ngày sinh */}
+                  <View style={styles.gridItemDateSmall}>
+                    <Text style={styles.label}>{ownerInfoFields[1].label}</Text>
+                    {renderField(
+                      ownerInfoFields[1],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[1].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[1].field}`,
+                    )}
+                  </View>
+
+                  {/* Số CMND/CCCD */}
+                  <View style={styles.gridItemDateLarge}>
+                    <Text style={styles.label}>{ownerInfoFields[2].label}</Text>
+                    {renderField(
+                      ownerInfoFields[2],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[2].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[2].field}`,
+                    )}
+                  </View>
+                </View>
+
+                {/* Row chứa Ngày cấp và Nơi cấp */}
+                <View style={styles.gridContainer}>
+                  {/* Nơi cấp */}
+                  <View style={styles.gridItemDateLarge}>
+                    <Text style={styles.label}>{ownerInfoFields[4].label}</Text>
+                    {renderField(
+                      ownerInfoFields[4],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[4].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[4].field}`,
+                    )}
+                  </View>
+                  {/* Ngày cấp */}
+                  <View style={styles.gridItemDateSmall}>
+                    <Text style={styles.label}>{ownerInfoFields[5].label}</Text>
+                    {renderField(
+                      ownerInfoFields[5],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[5].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[5].field}`,
+                    )}
+                  </View>
+                </View>
+
+                {/* Địa chỉ thường trú */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>{ownerInfoFields[3].label}</Text>
+                  {renderField(
+                    ownerInfoFields[3],
+                    getFieldValue(
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[3].field}`,
+                    ),
+                    `ownerInfos.${ownerIndex}.${ownerInfoFields[3].field}`,
+                  )}
+                </View>
+
+                {/* Remove Owner Button (except first owner) */}
+                {ownerIndex > 0 && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        ownerInfos: prev.ownerInfos.filter(
+                          (_, i) => i !== ownerIndex,
+                        ),
+                      }));
+                    }}>
+                    <Text style={styles.removeButtonText}>Xóa chủ sở hữu</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             ))}
+
+            {/* Add Owner Button */}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  ownerInfos: [
+                    ...prev.ownerInfos,
+                    {
+                      fullName: '',
+                      dayOfBirth: '2023-01-01T00:00:00Z',
+                      idCardNumber: '',
+                      idIssueDate: '2023-01-01T00:00:00Z',
+                      idIssuePlace: '',
+                      permanentAddress: '',
+                    },
+                  ],
+                }));
+              }}>
+              <Text style={styles.addButtonText}>Thêm chủ sở hữu</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Land Metadata Fields */}
@@ -377,8 +683,8 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
                 {renderField(
                   {field, label, placeholder, isDate},
                   getInputValue(
-                    formData.landAsset.transferInfo[
-                      field as keyof typeof formData.landAsset.transferInfo
+                    formData.transferInfo[
+                      field as keyof typeof formData.transferInfo
                     ],
                   ),
                   `landAsset.transferInfo.${field}`,
@@ -387,17 +693,55 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({
             ))}
           </View>
 
+          <View style={styles.section}>
+            <DocumentUpload
+              theme={theme}
+              selectedFiles={selectedFiles}
+              onFilesChange={files => {
+                setSelectedFiles(files);
+                // Cập nhật formData.documents khi files thay đổi
+                setFormData(prev => ({
+                  ...prev,
+                  documents: files.map(f => f.uri),
+                  documentIds: files.map(f => f.uri),
+                }));
+              }}
+              onDocumentIdsChange={ids => {
+                //setDocumentIds(ids);
+                // Cập nhật formData.documents khi ids thay đổi
+                setFormData(prev => ({
+                  ...prev,
+                  documents: ids,
+                  documentIds: ids,
+                }));
+              }}
+            />
+          </View>
+
           {/* Submit Button */}
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={isLoading}>
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Tiếp tục</Text>
-            )}
-          </TouchableOpacity>
+          {status === 'completed' ? null : fromScreen === 'InfoCreateLoan' ? (
+            <TouchableOpacity
+              style={[styles.submitButton, isLoading && {opacity: 0.7}]}
+              onPress={() => handleSubmit('update')}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Cập nhật</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.submitButton, isLoading && {opacity: 0.7}]}
+              onPress={() => handleSubmit('next')}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Tiếp tục</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/* Move DatePicker outside ScrollView */}

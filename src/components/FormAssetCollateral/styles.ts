@@ -334,4 +334,25 @@ export const createStyles = (theme: Theme) =>
       fontWeight: '600',
       textAlign: 'center',
     },
+    pieceContainer: {
+      marginBottom: 12,
+      padding: 12,
+      backgroundColor: theme.backgroundBox,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.borderInputBackground,
+    },
+    
+    pieceHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    
+    pieceTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.text,
+    },
   });
