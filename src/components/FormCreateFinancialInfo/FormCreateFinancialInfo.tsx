@@ -35,7 +35,7 @@ import {getDocuments, uploadImage} from '../../api/services/uploadImage';
 import {useRoute} from '@react-navigation/native';
 import {CreateFinancialInfo, History} from '../../api/types/loanworkflowtypes';
 import FileViewer from 'react-native-file-viewer';
-import {UploadResponse} from '../../api/types/upload';
+import {UploadResponseResult} from '../../api/types/upload';
 import ImageDisplay from '../ImageDisplay/ImageDisplay';
 import {ApiResponse} from '../../api/axiosInstance';
 
@@ -178,7 +178,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
         console.log('Files before API call:', formikRef.current?.values);
         console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
         const response = await financialInfo(appId, filteredValues);
-        if (response.code === 201) {
+        if (response.code === 200) {
           navigation.replace('LoadingWorkflowLoan', {appId});
         }
       } else if (actionType === 'update') {
@@ -381,12 +381,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     monthlySaving: Yup.number()
       .min(1000000, t('formCreateLoan.errors.invalidAmount'))
       .required(t('formCreateLoan.errors.missingFields')),
-    monthlyDebt: Yup.number()
-      .min(0, t('formCreateLoan.errors.invalidAmount'))
-      .required(t('formCreateLoan.errors.missingFields')),
-    monthlyLoanPayment: Yup.number()
-      .min(1000000, t('formCreateLoan.errors.invalidAmount'))
-      .required(t('formCreateLoan.errors.missingFields')),
     files: Yup.array().of(Yup.string()),
   });
   useEffect(() => {
@@ -447,25 +441,22 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
 
                   if (Array.isArray(documents) && documents.length > 0) {
                     const formattedFiles = documents
-                      .filter((doc): doc is ApiResponse<UploadResponse> => {
-                        if (
-                          !doc ||
-                          !doc.result ||
-                          typeof doc.status !== 'number'
-                        ) {
-                          console.log('Filtering out invalid doc:', doc);
-                          return false;
-                        }
-                        return true;
-                      })
-                      .map(doc => {
-                        console.log('Processing document:', doc);
+                      .filter(
+                        (doc): doc is ApiResponse<UploadResponseResult> => {
+                          if (!doc || !doc.result) {
+                            console.log('Filtering out invalid doc:', doc);
+                            return false;
+                          }
+                          return true;
+                        },
+                      )
+                      .map((doc: ApiResponse<UploadResponseResult>) => {
+                        // Thêm log để debug
+                        console.log('Mapping doc:', doc);
                         return {
-                          uri: doc.result.result.url || '',
-                          type:
-                            doc.result.result.type ||
-                            'application/octet-stream',
-                          name: doc.result.result.title || 'Unknown File',
+                          uri: doc.result.url || '',
+                          type: doc.result.type || 'application/octet-stream',
+                          name: doc.result.title || 'Unknown File',
                           fileCopyUri: null,
                           size: 0,
                           source: 'server' as const,

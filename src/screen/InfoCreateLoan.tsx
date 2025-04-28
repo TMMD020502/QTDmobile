@@ -18,7 +18,7 @@ import {RootStackParamList} from '../navigators/RootNavigator';
 import {RouteProp, useFocusEffect} from '@react-navigation/native';
 import {cancelLoan, fetchWorkflowStatus} from '../api/services/loan';
 //import {WorkflowResult} from '../api/types/loanInit';
-import {clearAccessApprovalProcessIdn} from '../../tokenStorage';
+
 import {useQuery} from '@tanstack/react-query';
 
 type InfoCreateLoanNavigationProp = StackNavigationProp<
@@ -91,7 +91,6 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
           onPress: async () => {
             try {
               await cancelLoan(appId);
-              await clearAccessApprovalProcessIdn();
               navigation.goBack();
             } catch (error) {
               console.log('Error canceling loan:', error);
@@ -381,7 +380,6 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
     const allowedSteps = [
       'init',
       'create-loan-request',
-      'create-loan-plan',
       'create-financial-info',
       'create-credit-rating',
       'add-asset-collateral',

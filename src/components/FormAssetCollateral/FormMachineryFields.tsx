@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -11,65 +11,229 @@ import InputBackground from '../InputBackground/InputBackground';
 import CurrencyInput from '../CurrencyInput/CurrencyInput';
 import DatePicker from '../DatePicker/DatePicker';
 import {formatDate} from '../../utils/dateUtils';
-import {addAssetCollateral} from '../../api/services/loan';
+import {
+  addAssetCollateral,
+  getworkflowbyapplicationid,
+  updateAssetCollateral,
+} from '../../api/services/loan';
 import {
   machineryFields,
   commonFields,
   machineryMetadataFields,
+  ownerInfoFields,
 } from './formFields';
 import {createStyles} from './styles';
 import {Theme} from '../../theme/colors';
-import KeyboardWrapper from '../KeyboardWrapper/KeyboardWrapper';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../../navigators/RootNavigator';
-import {ApiErrorResponse, MachineryFormData} from '../../api/types/addAssets';
+import {
+  ApiErrorResponse,
+  MachineryFormData,
+  OwnerInfo,
+  OwnershipType,
+} from '../../api/types/addAssets';
+import {useRoute} from '@react-navigation/native';
+import {History} from '../../api/types/loanworkflowtypes';
+import {getDocuments} from '../../api/services/uploadImage';
+import {DocumentPickerResponse} from 'react-native-document-picker';
+import DocumentUpload from '../DocumentUpload/documentupload';
 
 interface FormMachineryFieldsProps {
   theme: Theme;
   appId: string;
+  status?: string;
+  fromScreen?: string;
   onSuccess?: () => void;
   navigation: StackNavigationProp<RootStackParamList>;
 }
 
+interface ExtendedDocumentPickerResponse extends DocumentPickerResponse {
+  source: 'local' | 'server';
+}
+
 const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
   theme,
-  appId,
+
   navigation,
 }) => {
+  const route = useRoute();
+  const {appId, fromScreen, status} = route.params as {
+    appId: string;
+    fromScreen?: string;
+    status?: string;
+  };
+  const [selectedFiles, setSelectedFiles] = useState<
+    ExtendedDocumentPickerResponse[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDateField, setSelectedDateField] = useState<string | null>(
     null,
   );
   const [tempDate, setTempDate] = useState(new Date());
+  const [transactionId, setTransactionId] = useState<string>();
   const [formData, setFormData] = useState<MachineryFormData>({
     assetType: 'MACHINERY',
-    title: '',
+    title: 'Industrial CNC Machine',
     ownershipType: 'INDIVIDUAL',
-    proposedValue: 0,
-    documents: ['machinery_specs.pdf', 'warranty.pdf'],
+    proposedValue: 500000000,
+    documents: [],
+    ownerInfos: [
+      {
+        fullName: 'John Doe',
+        dayOfBirth: '1980-01-01T00:00:00Z',
+        idCardNumber: '123456789012',
+        idIssueDate: '2022-01-01T07:00:00Z',
+        idIssuePlace: 'công an HCM',
+        permanentAddress: '123 Villa Street, District 1',
+      },
+    ],
+    transferInfo: {
+      fullName: 'Previous Owner',
+      dayOfBirth: '1975-01-01T00:00:00Z',
+      idCardNumber: '987654321012',
+      idIssueDate: '2022-01-01T07:00:00Z',
+      idIssuePlace: 'công an HCM',
+      permanentAddress: '456 Old Street, District 2',
+      transferDate: '2022-01-01T00:00:00Z',
+      transferRecordNumber: 'TR0001',
+    },
     application: {id: appId},
     machinery: {
-      name: '',
-      model: '',
-      manufacturer: '',
-      manufactureDate: '',
-      purchaseDate: '',
-      purchasePrice: 0,
-      serialNumber: '',
-      location: '',
-      status: '',
-      note: '',
+      name: 'CNC Machine Pro 5000',
+      model: 'CNC-5000',
+      manufacturer: 'MachTech Industries',
+      manufactureDate: '2023-01-01T00:00:00Z',
+      purchaseDate: '2023-02-01T00:00:00Z',
+      purchasePrice: 450000000,
+      serialNumber: 'SN123456',
+      location: 'Factory A, Industrial Zone',
+      status: 'Operational',
+      note: 'High precision manufacturing equipment',
       metadata: {
-        warranty: '',
-        maintenanceSchedule: '',
-        powerConsumption: '',
-        precision: '',
+        warranty: '3 years',
+        maintenanceSchedule: 'Monthly',
+        powerConsumption: '380V/3-phase',
+        precision: '0.001mm',
       },
     },
   });
 
-  const styles = createStyles(theme);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getworkflowbyapplicationid<MachineryFormData>(appId);
+        if (data.result) {
+          const createLoanStep = data.result.steps.find(
+            step => step.name === 'add-asset-collateral',
+          );
+          setTransactionId(createLoanStep?.transactionId ?? '');
 
+          const lastValidHistory = Array.isArray(
+            createLoanStep?.metadata?.histories,
+          )
+            ? createLoanStep?.metadata?.histories
+                ?.filter(
+                  (history: History<MachineryFormData>) => !history?.error,
+                )
+                .at(-1)
+            : null;
+
+          const metadata =
+            lastValidHistory?.response.approvalProcessResponse?.metadata?.[0];
+
+          if (metadata) {
+            setFormData(prev => ({
+              ...prev,
+              assetType: 'MACHINERY',
+              title: metadata?.title || '',
+              ownershipType:
+                (metadata?.ownershipType as OwnershipType) || 'INDIVIDUAL',
+              proposedValue: metadata?.proposedValue || 0,
+              documents: metadata?.documents || [],
+              ownerInfos: (metadata?.ownerInfos || []).map(
+                (owner: OwnerInfo) => ({
+                  fullName: owner?.fullName || '',
+                  dayOfBirth: owner?.dayOfBirth || '1980-01-01T00:00:00Z',
+                  idCardNumber: owner?.idCardNumber || '',
+                  idIssueDate: owner?.idIssueDate || '2022-01-01T00:00:00Z',
+                  idIssuePlace: owner?.idIssuePlace || '',
+                  permanentAddress: owner?.permanentAddress || '',
+                }),
+              ),
+              transferInfo: {
+                fullName: metadata?.transferInfo?.fullName || '',
+                dayOfBirth:
+                  metadata?.transferInfo?.dayOfBirth || '1975-01-01T00:00:00Z',
+                idCardNumber: metadata?.transferInfo?.idCardNumber || '',
+                idIssueDate:
+                  metadata?.transferInfo?.idIssueDate || '2022-01-01T00:00:00Z',
+                idIssuePlace: metadata?.transferInfo?.idIssuePlace || '',
+                permanentAddress:
+                  metadata?.transferInfo?.permanentAddress || '',
+                transferDate:
+                  metadata?.transferInfo?.transferDate ||
+                  '2022-01-01T00:00:00Z',
+                transferRecordNumber:
+                  metadata?.transferInfo?.transferRecordNumber || '',
+              },
+              machinery: {
+                name: metadata?.machinery?.name || '',
+                model: metadata?.machinery?.model || '',
+                manufacturer: metadata?.machinery?.manufacturer || '',
+                manufactureDate:
+                  metadata?.machinery?.manufactureDate ||
+                  '2023-01-01T00:00:00Z',
+                purchaseDate:
+                  metadata?.machinery?.purchaseDate || '2023-02-01T00:00:00Z',
+                purchasePrice: metadata?.machinery?.purchasePrice || 0,
+                serialNumber: metadata?.machinery?.serialNumber || '',
+                location: metadata?.machinery?.location || '',
+                status: metadata?.machinery?.status || '',
+                note: metadata?.machinery?.note || '',
+                metadata: {
+                  warranty: metadata?.machinery?.metadata?.warranty || '',
+                  maintenanceSchedule:
+                    metadata?.machinery?.metadata?.maintenanceSchedule || '',
+                  powerConsumption:
+                    metadata?.machinery?.metadata?.powerConsumption || '',
+                  precision: metadata?.machinery?.metadata?.precision || '',
+                },
+              },
+              application: {id: appId},
+            }));
+          }
+
+          if (metadata?.documents?.length > 0) {
+            try {
+              const documents = await getDocuments(metadata?.documents);
+              const formattedFiles = documents
+                .filter(doc => doc)
+                .map(doc => ({
+                  uri: doc.result.url || '',
+                  type: doc.result.type || 'application/octet-stream',
+                  name: doc.result.title || 'Unknown File',
+                  fileCopyUri: null,
+                  size: 0,
+                  source: 'server' as const,
+                }));
+
+              if (formattedFiles.length > 0) {
+                setSelectedFiles(formattedFiles);
+              }
+            } catch (error) {
+              console.error('Error fetching documents:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching workflow:', error);
+      }
+    };
+
+    fetchData();
+  }, [appId]);
+
+  const styles = createStyles(theme);
   const handleChange = (field: string, value: any) => {
     setFormData(prev => {
       if (field.startsWith('machinery.metadata.')) {
@@ -102,15 +266,27 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
     });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (_actionType: 'next' | 'update') => {
     try {
       setIsLoading(true);
-      const response = await addAssetCollateral(appId, formData);
-      console.log('Successfully submitted machinery details:', response);
+      if (_actionType === 'next') {
+        const response = await addAssetCollateral(appId, formData);
 
-      // Navigate to CreditRating with the appId
-      if (response) {
-        navigation.replace('CreditRating', {appId});
+        // Navigate to CreditRating with the appId
+        if (response) {
+          navigation.replace('CreditRating', {appId});
+        }
+      } else {
+        console.log('formData', JSON.stringify(formData, null, 2));
+
+        const response = await updateAssetCollateral(
+          appId,
+          formData,
+          transactionId || '',
+        );
+        if (response && navigation) {
+          navigation.replace('InfoCreateLoan', {appId});
+        }
       }
     } catch (error) {
       const apiError = error as ApiErrorResponse;
@@ -142,6 +318,47 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
   const getInputValue = (value: any): string => {
     if (value === undefined || value === null) return '';
     return String(value);
+  };
+
+  const getFieldValue = (fieldPath: string): any => {
+    const parts = fieldPath.split('.');
+
+    // Handle direct properties of formData
+    if (parts.length === 1) {
+      return formData[parts[0] as keyof typeof formData];
+    }
+    if (parts[0] === 'ownerInfos') {
+      const [_, index, field] = parts;
+      const ownerIndex = parseInt(index);
+      const owner = formData.ownerInfos[ownerIndex];
+
+      // Use type assertion to tell TypeScript that field is a valid key of OwnerInfo
+      return owner?.[field as keyof OwnerInfo] ?? '';
+    }
+    if (parts[0] === 'transferInfo') {
+      // Thêm case xử lý ownerInfos
+      return formData.transferInfo[
+        parts[1] as keyof typeof formData.transferInfo
+      ];
+    }
+    // Handle apartment properties
+    if (parts.length >= 2 && parts[0] === 'apartment') {
+      if (parts.length === 2) {
+        return formData.apartment[parts[1] as keyof typeof formData.apartment];
+      }
+
+      // Handle nested properties
+      if (parts.length === 3) {
+        const section = formData.apartment[
+          parts[1] as keyof typeof formData.apartment
+        ] as any;
+        if (section) {
+          return section[parts[2]];
+        }
+      }
+    }
+
+    return '';
   };
 
   const handleDatePress = (fieldPath: string) => {
@@ -286,6 +503,136 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
             )}
           </View>
 
+          {/* Owner Info Fields */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Thông tin chủ sở hữu</Text>
+
+            {formData.ownerInfos.map((owner, ownerIndex) => (
+              <View key={ownerIndex} style={styles.ownerSection}>
+                {ownerIndex > 0 && (
+                  <Text style={styles.ownerTitle}>
+                    Chủ sở hữu {ownerIndex + 1}
+                  </Text>
+                )}
+
+                {/* Thông tin cơ bản - fullName */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>{ownerInfoFields[0].label}</Text>
+                  {renderField(
+                    ownerInfoFields[0],
+                    getFieldValue(
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[0].field}`,
+                    ),
+                    `ownerInfos.${ownerIndex}.${ownerInfoFields[0].field}`,
+                  )}
+                </View>
+
+                {/* Row chứa Ngày sinh và CCCD */}
+                <View style={styles.gridContainer}>
+                  {/* Ngày sinh */}
+                  <View style={styles.gridItemDateSmall}>
+                    <Text style={styles.label}>{ownerInfoFields[1].label}</Text>
+                    {renderField(
+                      ownerInfoFields[1],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[1].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[1].field}`,
+                    )}
+                  </View>
+
+                  {/* Số CMND/CCCD */}
+                  <View style={styles.gridItemDateLarge}>
+                    <Text style={styles.label}>{ownerInfoFields[2].label}</Text>
+                    {renderField(
+                      ownerInfoFields[2],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[2].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[2].field}`,
+                    )}
+                  </View>
+                </View>
+
+                {/* Row chứa Ngày cấp và Nơi cấp */}
+                <View style={styles.gridContainer}>
+                  {/* Nơi cấp */}
+                  <View style={styles.gridItemDateLarge}>
+                    <Text style={styles.label}>{ownerInfoFields[4].label}</Text>
+                    {renderField(
+                      ownerInfoFields[4],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[4].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[4].field}`,
+                    )}
+                  </View>
+                  {/* Ngày cấp */}
+                  <View style={styles.gridItemDateSmall}>
+                    <Text style={styles.label}>{ownerInfoFields[5].label}</Text>
+                    {renderField(
+                      ownerInfoFields[5],
+                      getFieldValue(
+                        `ownerInfos.${ownerIndex}.${ownerInfoFields[5].field}`,
+                      ),
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[5].field}`,
+                    )}
+                  </View>
+                </View>
+
+                {/* Địa chỉ thường trú */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.label}>{ownerInfoFields[3].label}</Text>
+                  {renderField(
+                    ownerInfoFields[3],
+                    getFieldValue(
+                      `ownerInfos.${ownerIndex}.${ownerInfoFields[3].field}`,
+                    ),
+                    `ownerInfos.${ownerIndex}.${ownerInfoFields[3].field}`,
+                  )}
+                </View>
+
+                {/* Remove Owner Button (except first owner) */}
+                {ownerIndex > 0 && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        ownerInfos: prev.ownerInfos.filter(
+                          (_, i) => i !== ownerIndex,
+                        ),
+                      }));
+                    }}>
+                    <Text style={styles.removeButtonText}>Xóa chủ sở hữu</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+
+            {/* Add Owner Button */}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  ownerInfos: [
+                    ...prev.ownerInfos,
+                    {
+                      fullName: '',
+                      dayOfBirth: '2023-01-01T00:00:00Z',
+                      idCardNumber: '',
+                      idIssueDate: '2023-01-01T00:00:00Z',
+                      idIssuePlace: '',
+                      permanentAddress: '',
+                    },
+                  ],
+                }));
+              }}>
+              <Text style={styles.addButtonText}>Thêm chủ sở hữu</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Metadata Fields */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin bổ sung</Text>
@@ -307,16 +654,55 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
             )}
           </View>
 
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={isLoading}>
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Tiếp tục</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.section}>
+            <DocumentUpload
+              theme={theme}
+              selectedFiles={selectedFiles}
+              onFilesChange={files => {
+                setSelectedFiles(files);
+                // Cập nhật formData.documents khi files thay đổi
+                setFormData(prev => ({
+                  ...prev,
+                  documents: files.map(f => f.uri),
+                  documentIds: files.map(f => f.uri),
+                }));
+              }}
+              onDocumentIdsChange={ids => {
+                //setDocumentIds(ids);
+                // Cập nhật formData.documents khi ids thay đổi
+                setFormData(prev => ({
+                  ...prev,
+                  documents: ids,
+                  documentIds: ids,
+                }));
+              }}
+            />
+          </View>
+
+          {/* Submit Button */}
+          {status === 'completed' ? null : fromScreen === 'InfoCreateLoan' ? (
+            <TouchableOpacity
+              style={[styles.submitButton, isLoading && {opacity: 0.7}]}
+              onPress={() => handleSubmit('update')}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Cập nhật</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.submitButton, isLoading && {opacity: 0.7}]}
+              onPress={() => handleSubmit('next')}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Tiếp tục</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {selectedDateField && (

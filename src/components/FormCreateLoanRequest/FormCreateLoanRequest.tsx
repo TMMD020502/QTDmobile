@@ -177,20 +177,30 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     {
       value: 'EQUAL_INSTALLMENTS',
       label:
-        currentLanguage === 'vi' ? 'Trả đều gốc và lãi' : 'Equal Installments',
+        currentLanguage === 'vi'
+          ? 'Trả góp hàng tháng (gốc + lãi cố định)'
+          : 'Monthly Installments (Fixed Principal + Interest)',
     },
     {
       value: 'EQUAL_PRINCIPAL',
-      label: currentLanguage === 'vi' ? 'Trả đều gốc' : 'Equal Principal',
+      label:
+        currentLanguage === 'vi'
+          ? 'Trả góp hàng tháng (gốc + lãi giảm dần)'
+          : 'Monthly Installment (Fixed Principal + Decreasing Interest)',
     },
     {
       value: 'INTEREST_ONLY',
-      label: currentLanguage === 'vi' ? 'Chỉ trả lãi' : 'Interest Only',
+      label:
+        currentLanguage === 'vi'
+          ? 'Chỉ trả lãi hàng tháng, trả gốc sau'
+          : 'Pay Interest Monthly, Principal Later',
     },
     {
       value: 'BULLET_PAYMENT',
       label:
-        currentLanguage === 'vi' ? 'Trả một lần cuối kỳ' : 'Bullet Payment',
+        currentLanguage === 'vi'
+          ? 'Trả toàn bộ vào cuối kỳ (gốc + lãi)'
+          : 'Lump Sum at Maturity (Principal + Interest)',
     },
   ];
 
@@ -465,19 +475,12 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     if (!formData.repaymentMethod.trim()) {
       newErrors.repaymentMethod =
         currentLanguage === 'vi'
-          ? 'Vui lòng nhập kế hoạch trả nợ'
+          ? 'Vui lòng chọn phương thức trả nợ'
           : 'Please enter repayment plan';
       isValid = false;
     }
 
     // Validate note
-    if (!formData.note.trim()) {
-      newErrors.note =
-        currentLanguage === 'vi'
-          ? 'Vui lòng nhập ghi chú'
-          : 'Please enter a note';
-      isValid = false;
-    }
 
     setErrors(newErrors);
     return isValid;
@@ -516,7 +519,8 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
         if (response.code === 201) {
           navigation.replace('CreateFinancialInfo', {appId});
         }
-      } else {
+      } else if (_actionType === 'update') {
+        console.log('test');
         const response = await updateLoanRequest(
           appId,
           loanData,
@@ -847,14 +851,14 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
         </View>
         <View style={styles.boxInput}>
           <Text style={styles.headingTitle}>
-            {currentLanguage === 'vi' ? 'Kế hoạch trả nợ' : 'Repayment Plan'}
+            {currentLanguage === 'vi' ? 'Phương thức trả nợ' : 'Repayment Plan'}
           </Text>
           <DropdownComponent
             value={formData.repaymentMethod}
             data={repaymentMethods}
             placeholder={
               currentLanguage === 'vi'
-                ? 'Chọn kế hoạch trả nợ'
+                ? 'Chọn phương thức trả nợ'
                 : 'Select repayment plan'
             }
             onChange={(value: TargetItem) =>

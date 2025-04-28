@@ -6,8 +6,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
-  Image,
-  Modal,
 } from 'react-native';
 import InputBackground from '../InputBackground/InputBackground';
 import CurrencyInput from '../CurrencyInput/CurrencyInput';
@@ -38,14 +36,10 @@ import {
 import {useTranslation} from 'react-i18next';
 import {useRoute} from '@react-navigation/native';
 import {Apartment, History} from '../../api/types/loanworkflowtypes';
-import {getDocuments, uploadImage} from '../../api/services/uploadImage';
-import DocumentPicker, {
-  DocumentPickerResponse,
-} from 'react-native-document-picker';
+import {getDocuments} from '../../api/services/uploadImage';
+import {DocumentPickerResponse} from 'react-native-document-picker';
 
-import FileViewer from 'react-native-file-viewer';
-
-import {UploadResponse} from '../../api/types/upload';
+import {UploadResponseResult} from '../../api/types/upload';
 import DocumentUpload from '../DocumentUpload/documentupload';
 import {ApiResponse} from '../../api/axiosInstance';
 interface FormApartmentFieldsProps {
@@ -76,7 +70,7 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
   const [selectedFiles, setSelectedFiles] = useState<
     ExtendedDocumentPickerResponse[]
   >([]);
-  const [documentIds, setDocumentIds] = useState<string[]>([]);
+
   //const [showImage, setShowImage] = useState(false); // Trạng thái hiển thị Modal
   //const [selectedFileUri, setSelectedFileUri] = useState<string | null>(null); // URL của file cần hiển thị
   const [tempDate, setTempDate] = useState(new Date());
@@ -108,7 +102,7 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
       idIssuePlace: 'công an HCM',
       permanentAddress: '456 Old Street, District 2',
       transferDate: '2022-01-01T00:00:00Z',
-      transferRecordNumber: 'TR001',
+      transferRecordNumber: 'TR0001',
     },
     apartment: {
       plotNumber: 'PLT001',
@@ -137,78 +131,6 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
       },
     },
   });
-  // Format file size
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-  };
-  const handleFilePress = (file: ExtendedDocumentPickerResponse) => {
-    if (file.source === 'local') {
-      handleViewFile(file.uri); // Mở file từ thiết bị
-    } else if (file.source === 'server') {
-      setSelectedFileUri(file.uri); // Lưu URL của file từ server
-      setShowImage(true); // Hiển thị Modal
-    }
-  };
-  const handleViewFile = async (fileUri: string) => {
-    try {
-      // Thử mở file với URI ban đầu
-      await FileViewer.open(fileUri);
-    } catch (error) {
-      console.error('Error opening file with original URI:', error);
-    }
-  };
-  const handleDocumentPick = async () => {
-    const res = await DocumentPicker.pick({
-      type: [DocumentPicker.types.allFiles], // Chọn loại tệp bạn muốn cho phép
-    });
-    console.log('Selected file1:', res[0]);
-    const File: ExtendedDocumentPickerResponse = {
-      ...res[0],
-      source: 'local', // Đánh dấu file từ thiết bị
-    };
-    /*
-      const fileUri =
-        Platform.OS === 'android' && !res[0].uri.startsWith('file://')
-          ? `file://${res[0].uri}`
-          : res[0].uri;*/
-    const file = {
-      uri: res[0].uri,
-      type: res[0].type || 'application/octet-stream',
-      fileName: res[0].name || '',
-      source: 'local',
-      typeapi: 'FINANCIAL_INFO',
-    };
-    console.log('Formdata:' + JSON.stringify(file));
-    const uploadResponse = await uploadImage(file);
-
-    if (uploadResponse) {
-      // 🎯 Hiển thị đầy đủ thông tin phản hồi
-      console.log('✅ Response:', uploadResponse);
-      console.log('📌 Id:', uploadResponse.id);
-
-      setSelectedFiles(prev => [...prev, File]);
-      setFormData(prev => ({
-        ...prev,
-        documents: [...prev.documents, uploadResponse.id ?? ''],
-      }));
-    }
-  };
-  const handleRemoveFile = (index: number) => {
-    // Remove file from selectedFiles state
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-
-    // Remove file ID from documents array in formData
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents.filter((_, i) => i !== index),
-    }));
-
-    // Clear saved document IDs from storage
-  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -219,11 +141,12 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
             step => step.name === 'add-asset-collateral',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
+          /*
           // Check if there's existing data
           if (formData.title || formData.proposedValue > 0) {
             console.log('Existing data found, skipping update');
             return; // Skip updating if there's existing data
-          }
+          }*/
           const lastValidHistory = Array.isArray(
             createLoanStep?.metadata?.histories,
           )
@@ -231,167 +154,111 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
                 ?.filter((history: History<Apartment>) => !history?.error)
                 .at(-1)
             : null;
-
+          console.log(
+            'financialData',
+            JSON.stringify(lastValidHistory, null, 2),
+          );
+          console.log(
+            'financialData',
+            JSON.stringify(
+              lastValidHistory?.response.approvalProcessResponse?.metadata[0]
+                ?.documents,
+              null,
+              2,
+            ),
+          );
+          const metadata =
+            lastValidHistory.response.approvalProcessResponse?.metadata[0];
           setFormData(prev => ({
             ...prev,
             assetType: 'APARTMENT',
-            title:
-              lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                ?.title || '',
+            title: metadata?.title || '',
             ownershipType:
-              (lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                ?.ownershipType as OwnershipType) || ('' as OwnershipType),
-            proposedValue:
-              lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                ?.proposedValue || 0,
-            documents:
-              lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                ?.documents || [],
-            ownerInfos: [
-              {
-                fullName:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.ownerInfos?.fullName || '',
-                dayOfBirth:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.ownerInfos?.dayOfBirth ||
-                  '2023-01-01T00:00:00Z',
-                idCardNumber:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.ownerInfos?.idCardNumber || '',
-                idIssueDate:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.ownerInfos?.idIssueDate ||
-                  '2023-01-01T00:00:00Z',
-                idIssuePlace:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.ownerInfos?.idIssuePlace || '',
-                permanentAddress:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.ownerInfos?.permanentAddress || '',
-              },
-            ],
+              (metadata?.ownershipType as OwnershipType) ||
+              ('' as OwnershipType),
+            proposedValue: metadata?.proposedValue || 0,
+            documents: metadata?.documents || [],
+            ownerInfos: (metadata?.ownerInfos || []).map(
+              (owner: OwnerInfo) => ({
+                fullName: owner?.fullName || '',
+                dayOfBirth: owner?.dayOfBirth || '2023-01-01T00:00:00Z',
+                idCardNumber: owner?.idCardNumber || '',
+                idIssueDate: owner?.idIssueDate || '2023-01-01T00:00:00Z',
+                idIssuePlace: owner?.idIssuePlace || '',
+                permanentAddress: owner?.permanentAddress || '',
+              }),
+            ),
             transferInfo: {
-              fullName:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.fullName || '',
+              fullName: metadata?.transferInfo?.fullName || '',
               dayOfBirth:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.dayOfBirth || '2023-01-01T00:00:00Z',
-              idCardNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.idCardNumber || '',
+                metadata?.transferInfo?.dayOfBirth || '2023-01-01T00:00:00Z',
+              idCardNumber: metadata?.transferInfo?.idCardNumber || '',
               idIssueDate:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.idIssueDate || '2023-01-01T00:00:00Z',
-              idIssuePlace:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.idIssuePlace || '',
-              permanentAddress:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.permanentAddress || '',
+                metadata?.transferInfo?.idIssueDate || '2023-01-01T00:00:00Z',
+              idIssuePlace: metadata?.transferInfo?.idIssuePlace || '',
+              permanentAddress: metadata?.transferInfo?.permanentAddress || '',
               transferDate:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.transferDate || '2023-01-01T00:00:00Z',
+                metadata?.transferInfo?.transferDate || '2023-01-01T00:00:00Z',
               transferRecordNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.transferInfo?.transferRecordNumber || '',
+                metadata?.transferInfo?.transferRecordNumber || '',
             },
             apartment: {
-              plotNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.plotNumber || '',
-              mapNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.mapNumber || '',
-              address:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.address || '',
-              area:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.area || 0,
-              purpose:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.purpose || '',
-              name:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.name || '',
-              floorArea:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.floorArea || 0,
-              typeOfHousing:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.typeOfHousing || '',
-              typeOfOwnership:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.typeOfOwnership || '',
-              ownershipTerm:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.ownershipTerm || '',
-              notes:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.notes || '',
-              sharedFacilities:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.sharedFacilities || '',
-              certificateNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.certificateNumber || '',
+              plotNumber: metadata?.apartment?.plotNumber || '',
+              mapNumber: metadata?.apartment?.mapNumber || '',
+              address: metadata?.apartment?.address || '',
+              area: metadata?.apartment?.area || 0,
+              purpose: metadata?.apartment?.purpose || '',
+              name: metadata?.apartment?.name || '',
+              floorArea: metadata?.apartment?.floorArea || 0,
+              typeOfHousing: metadata?.apartment?.typeOfHousing || '',
+              typeOfOwnership: metadata?.apartment?.typeOfOwnership || '',
+              ownershipTerm: metadata?.apartment?.ownershipTerm || '',
+              notes: metadata?.apartment?.notes || '',
+              sharedFacilities: metadata?.apartment?.sharedFacilities || '',
+              certificateNumber: metadata?.apartment?.certificateNumber || '',
               certificateBookNumber:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.certificateBookNumber || '',
-              issuingAuthority:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.issuingAuthority || '',
+                metadata?.apartment?.certificateBookNumber || '',
+              issuingAuthority: metadata?.apartment?.issuingAuthority || '',
               issueDate:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.issueDate || '2023-01-01T00:00:00Z',
+                metadata?.apartment?.issueDate || '2023-01-01T00:00:00Z',
               expirationDate:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.expirationDate || '2023-01-01T00:00:00Z',
-              originOfUsage:
-                lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                  ?.apartment?.originOfUsage || '', // Thêm trường này
+                metadata?.apartment?.expirationDate || '2023-01-01T00:00:00Z',
+              originOfUsage: metadata?.apartment?.originOfUsage || '', // Thêm trường này
               metadata: {
                 // Đảm bảo đủ trường metadata
-                parkingSpace:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.apartment?.metadata?.parkingSpace || '',
-                floor:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.apartment?.metadata?.floor || 0,
-                view:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.apartment?.metadata?.view || '',
+                parkingSpace: metadata?.apartment?.metadata?.parkingSpace || '',
+                floor: metadata?.apartment?.metadata?.floor || 0,
+                view: metadata?.apartment?.metadata?.view || '',
                 renovationStatus:
-                  lastValidHistory?.response.approvalProcessResponse
-                    ?.metadata[0]?.apartment?.metadata?.renovationStatus || '',
+                  metadata?.apartment?.metadata?.renovationStatus || '',
               },
             },
             application: {id: appId},
           }));
           // Thêm kiểm tra lastValidHistory có tồn tại và có files không
-          if (lastValidHistory?.files && lastValidHistory.files.length > 0) {
+          if (metadata?.documents && metadata?.documents.length > 0) {
             try {
-              console.log('Files to fetch:', lastValidHistory.files);
-              const documents = await getDocuments(lastValidHistory.files);
+              console.log(
+                'Files to fetch:',
+                JSON.stringify(metadata?.documents, null, 2),
+              );
+              const documents = await getDocuments(metadata?.documents);
               console.log('Raw documents response:', documents);
 
               if (Array.isArray(documents) && documents.length > 0) {
                 const formattedFiles = documents
-                  .filter((doc: ApiResponse<UploadResponse>) => {
+                  .filter((doc: ApiResponse<UploadResponseResult>) => {
                     // Thêm log để debug
                     console.log('Checking doc:', doc);
-                    return doc && doc.result;
+                    return doc;
                   })
-                  .map((doc: ApiResponse<UploadResponse>) => {
+                  .map((doc: ApiResponse<UploadResponseResult>) => {
                     // Thêm log để debug
                     console.log('Mapping doc:', doc);
                     return {
-                      uri: doc.result.result.url || '',
-                      type:
-                        doc.result.result.type || 'application/octet-stream',
-                      name: doc.result.result.title || 'Unknown File',
+                      uri: doc.result.url || '',
+                      type: doc.result.type || 'application/octet-stream',
+                      name: doc.result.title || 'Unknown File',
                       fileCopyUri: null,
                       size: 0,
                       source: 'server' as const,
@@ -401,13 +268,7 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
                 console.log('Formatted files:', formattedFiles);
                 if (formattedFiles.length > 0) {
                   setSelectedFiles(formattedFiles); // Đặt state
-                  setDocumentIds(formattedFiles.map(f => f.uri)); // Cập nhật documentIds
-
-                  // Cập nhật formData
-                  setFormData(prev => ({
-                    ...prev,
-                    documents: formattedFiles.map(f => f.uri),
-                  }));
+                  // setDocumentIds(formattedFiles.map(f => f.uri)); // Cập nhật documentIds
                 }
               }
             } catch (error) {
@@ -421,7 +282,7 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
     };
 
     fetchData();
-  }, [appId, formData.title, formData.proposedValue]);
+  }, [appId]);
   const styles = createStyles(theme);
 
   const handleChange = (field: string, value: any) => {
@@ -490,7 +351,8 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
           navigation.replace('InfoCreateLoan', {appId});
         }
       } else {
-        console.log('formData', formData);
+        console.log('formData', JSON.stringify(formData, null, 2));
+
         const response = await updateAssetCollateral(
           appId,
           formData,
@@ -1181,7 +1043,7 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
                 }));
               }}
               onDocumentIdsChange={ids => {
-                setDocumentIds(ids);
+                //setDocumentIds(ids);
                 // Cập nhật formData.documents khi ids thay đổi
                 setFormData(prev => ({
                   ...prev,

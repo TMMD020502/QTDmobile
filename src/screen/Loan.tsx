@@ -25,7 +25,7 @@ import {useSelector} from 'react-redux';
 import {Application} from '../api/types/getApplications';
 import {Theme} from '../theme/colors';
 import {RouteProp, useFocusEffect} from '@react-navigation/native';
-import {useQuery} from '@tanstack/react-query';
+import {useInfiniteQuery, useQuery} from '@tanstack/react-query';
 
 type LoanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Loan'>;
 
