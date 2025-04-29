@@ -1,0 +1,16 @@
+workflows:
+  ios-workflow:
+    name: Build iOS unsigned
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      vars:
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+    scripts:
+      - name: Build ipa without signing
+        script: |
+          xcodebuild -workspace $XCODE_WORKSPACE -scheme $XCODE_SCHEME -configuration Release -sdk iphoneos -archivePath $HOME/Runner.xcarchive archive
+          xcodebuild -exportArchive -archivePath $HOME/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $HOME/build
+    artifacts:
+      - build/*.ipa
