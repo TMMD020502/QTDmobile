@@ -5,9 +5,36 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       vars:
-        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_WORKSPACE: "ios/Runner.xcworkspace"   # <- Thêm đúng đường dẫn nếu bạn đang để trong ios/
         XCODE_SCHEME: "Runner"
     scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+          cd ..
+      - name: Create exportOptions.plist
+        script: |
+          cat > exportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>provisioningProfiles</key>
+              <dict>
+              </dict>
+          </dict>
+          </plist>
+          EOF
       - name: Build ipa without signing
         script: |
           xcodebuild -workspace $XCODE_WORKSPACE -scheme $XCODE_SCHEME -configuration Release -sdk iphoneos -archivePath $HOME/Runner.xcarchive archive
