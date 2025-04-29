@@ -7,7 +7,7 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/MobileApp.xcworkspace"   
         XCODE_SCHEME: "MobileApp"                      
-        scripts:
+    scripts:
       - name: Install npm dependencies
         script: |
           npm install
