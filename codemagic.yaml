@@ -14,7 +14,7 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios
-          pod install
+          pod install || exit 1
           cd ..
       - name: Create exportOptions.plist
         script: |
@@ -37,7 +37,7 @@ workflows:
           EOF
       - name: Build ipa without signing
         script: |
-          xcodebuild -workspace $XCODE_WORKSPACE -scheme $XCODE_SCHEME -configuration Release -sdk iphoneos -archivePath $HOME/Runner.xcarchive archive
-          xcodebuild -exportArchive -archivePath $HOME/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $HOME/build
+          xcodebuild -workspace $XCODE_WORKSPACE -scheme $XCODE_SCHEME -configuration Release -sdk iphoneos -archivePath $HOME/Runner.xcarchive archive || exit 1
+          xcodebuild -exportArchive -archivePath $HOME/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $HOME/build || exit 1
     artifacts:
       - build/*.ipa
