@@ -7,15 +7,18 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/MobileApp.xcworkspace"   
         XCODE_SCHEME: "MobileApp"                      
-    scripts:
+        scripts:
       - name: Install npm dependencies
         script: |
           npm install
       - name: Install CocoaPods
         script: |
           cd ios
-          pod install || exit 1
+          pod install --repo-update || exit 1
           cd ..
+      - name: Clean before build
+        script: |
+          xcodebuild clean -workspace $XCODE_WORKSPACE -scheme $XCODE_SCHEME -configuration Release
       - name: Create exportOptions.plist
         script: |
           cat > exportOptions.plist <<EOF
@@ -39,5 +42,6 @@ workflows:
         script: |
           xcodebuild -workspace $XCODE_WORKSPACE -scheme $XCODE_SCHEME -configuration Release -sdk iphoneos -archivePath $HOME/MobileApp.xcarchive archive || exit 1
           xcodebuild -exportArchive -archivePath $HOME/MobileApp.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $HOME/build || exit 1
+
     artifacts:
       - build/*.ipa
