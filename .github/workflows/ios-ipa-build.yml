@@ -3,6 +3,12 @@ name: iOS-ipa-build-react-native
 on:
   workflow_dispatch: # Cho phép chạy thủ công
 
+  
+# Thêm phần permissions
+permissions:
+  contents: write # Cấp quyền write để tạo và chỉnh sửa release
+  
+
 jobs:
   build-ios:
     name: 🎉 iOS Build (React Native)
