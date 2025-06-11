@@ -1,5 +1,5 @@
-import React, {useState, useEffect, useRef} from 'react';
-import {View, Text, StyleSheet, Alert, Dimensions, Platform, BackHandler} from 'react-native';
+import React, {useState} from 'react';
+import {View, Text, StyleSheet, Alert, Dimensions} from 'react-native';
 import {Camera, CameraType} from 'react-native-camera-kit';
 import {RouteProp} from '@react-navigation/native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -68,7 +68,7 @@ const QRScannerApp: React.FC<QRScannerAppProps> = ({navigation, route}) => {
     nativeEvent: {codeStringValue: string};
   }) => {
     const currentCode = event.nativeEvent.codeStringValue;
-    if (!isScanning || !currentCode || isDuplicateCode(currentCode)) return;
+    if (!isScanning || !currentCode || isDuplicateCode(currentCode)) {return};
 
     try {
       const qrData = processQRData(currentCode);
@@ -80,7 +80,7 @@ const QRScannerApp: React.FC<QRScannerAppProps> = ({navigation, route}) => {
         qrData: qrData,
       });
     } catch (error) {
-      console.log('Scanning error:', error);
+      console.error('Scanning error:', error);
       Alert.alert('Error', 'Failed to process QR code');
     }
   };
@@ -88,22 +88,18 @@ const QRScannerApp: React.FC<QRScannerAppProps> = ({navigation, route}) => {
   // Reset scanner state when component is focused (coming back from ResultQR screen)
   useFocusEffect(
     React.useCallback(() => {
-      console.log('Screen focused, resetting scanner state');
       setLastScannedCode(null);
       setIsScanning(true);
 
-      return () => {
-        // This runs when the screen is unfocused
-        console.log('Screen unfocused');
-      };
+      return () => {};
     }, []),
   );
 
   // Add a reset function that can be called manually if needed
-  const resetScanner = () => {
-    setLastScannedCode(null);
-    setIsScanning(true);
-  };
+  // const resetScanner = () => {
+  //   setLastScannedCode(null);
+  //   setIsScanning(true);
+  // };
 
   return (
     <View style={styles.container}>

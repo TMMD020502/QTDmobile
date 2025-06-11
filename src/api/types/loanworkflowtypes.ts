@@ -17,7 +17,7 @@ export type StepName =
 export interface LoanWorkflowResponseS<T, M = T | T[]> {
   code: number;
   message: string;
-  result: WorkflowResult<M>;
+  result: WorkflowResult<M>[];
 }
 
 export interface WorkflowResult<T, M = T | T[]> {
@@ -85,7 +85,7 @@ export interface HistoryResponse<T, M = T | T[]> {
 export type BorrowerType = 'INDIVIDUAL' | 'ORGANIZATION';
 export type LoanSecurityType = 'MORTGAGE' | 'UNSECURED' | 'PLEDGE' | 'NONE';
 export type LoanCollateralType = 'VEHICLE' | 'LAND' | 'APARTMENT' | 'OTHER';
-export type InterestType = 'FIXED' | 'FLOATING';
+export type InterestCalculationType = 'FIXED' | 'FLOATING';
 export interface LoanRequest {
   purpose: string;
   amount: number;
@@ -94,7 +94,7 @@ export interface LoanRequest {
   loanCollateralTypes: LoanCollateralType[];
   monthlyIncome: number;
   repaymentMethod: string;
-  interestType: InterestType;
+  interestCalculationType: InterestCalculationType;
   note: string;
   loanTerm: number;
   interestRate: number | undefined;

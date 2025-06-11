@@ -1,3 +1,4 @@
+import React, {useState} from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import React from 'react';
 import {AppIcons} from '../../icons';
 
 interface InputBorderProps {
@@ -17,6 +17,7 @@ interface InputBorderProps {
   onSetValue: (value: string) => void;
   value: string;
   theme: {
+    inputBackground: string;
     noteText: string;
     iconColor: string;
     text: string;
@@ -49,89 +50,82 @@ const InputBorder: React.FC<InputBorderProps> = ({
   notChange,
   error,
 }) => {
-  // Create a dedicated press handler for touchable fields
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-    }
-  };
+  const [isFocused, setIsFocused] = useState(false);
 
   const styles = StyleSheet.create({
     heading: {
       fontSize: 14,
-      marginBottom: 16,
-      color: theme.noteText,
-    },
-    icon: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      tintColor: theme.iconColor,
-      width: 24,
-      height: 24,
-    },
-    iconPosition: {
-      position: 'absolute',
-      right: 0,
-    },
-    textInput: {
-      borderBottomColor: theme.noteText,
-      borderBottomWidth: 1,
-      height: 32,
-      paddingLeft: 40,
-      paddingRight: 30,
-      paddingBottom: 10,
-      color: notChange ? theme.noteText : theme.text,
-      paddingVertical: 0,
-      textAlignVertical: 'center',
+      marginBottom: 10,
+      color: theme.text,
+      fontWeight: '500',
     },
     inputContainer: {
-      position: 'relative',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.inputBackground,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: isFocused ? '#0066ff' : '#e0e0e0',
+      paddingHorizontal: 14,
+      paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
+      elevation: 2,
     },
-    touchableContainer: {
-      width: '100%',
+    icon: {
+      marginRight: 10,
+      width: 22,
+      height: 22,
+      tintColor: '#5e5c5c',
+    },
+    textInput: {
+      flex: 1,
+      fontSize: 16,
+      color: notChange ? theme.noteText : theme.text,
+      fontFamily: 'Roboto',
+      paddingVertical: 0,
+      backgroundColor: 'transparent',
+    },
+    iconEyes: {
+      marginLeft: 8,
+      width: 24,
+      height: 24,
+      //tintColor: theme.iconColor,
     },
     errorText: {
       color: 'red',
       fontSize: 12,
       marginTop: 4,
-    },
-    iconEyes: {
-      bottom: Platform.OS === 'ios' ? 4 : 4,
-      paddingVertical: 0,
-      tintColor: theme.iconColor,
-      width: 24,
-      height: 24,
+      marginLeft: 6,
     },
   });
 
-  // For touchable inputs (like date fields), return a completely different component structure
+  // For touchable inputs (like date fields)
   if (onPress) {
     return (
       <View style={{marginBottom: 20}}>
         <Text style={styles.heading}>{name}</Text>
-        <View style={styles.inputContainer}>
+        <TouchableOpacity
+          onPress={onPress}
+          activeOpacity={0.7}
+          style={[
+            styles.inputContainer,
+            {backgroundColor: theme.inputBackground},
+          ]}>
           <Image source={iconSource} style={styles.icon} />
-
-          {/* Wrap the entire input area with TouchableOpacity */}
-          <TouchableOpacity
-            onPress={handlePress}
-            activeOpacity={0.7}
-            style={styles.touchableContainer}>
-            {/* Explicitly make TextInput non-interactive for Android */}
-            <TextInput
-              placeholder={placeholder}
-              placeholderTextColor={theme.noteText}
-              value={value}
-              style={styles.textInput}
-              editable={false} // Force non-editable for touchable fields
-              pointerEvents="none"
-              autoCapitalize="none"
-            />
-          </TouchableOpacity>
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
-        </View>
+          <TextInput
+            placeholder={placeholder}
+            placeholderTextColor={theme.noteText}
+            value={value}
+            style={styles.textInput}
+            editable={false}
+            pointerEvents="none"
+            autoCapitalize="none"
+          />
+        </TouchableOpacity>
+        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
     );
   }
@@ -140,7 +134,11 @@ const InputBorder: React.FC<InputBorderProps> = ({
   return (
     <View style={{marginBottom: 20}}>
       <Text style={styles.heading}>{name}</Text>
-      <View style={styles.inputContainer}>
+      <View
+        style={[
+          styles.inputContainer,
+          {backgroundColor: theme.inputBackground},
+        ]}>
         <Image source={iconSource} style={styles.icon} />
         <TextInput
           placeholder={placeholder}
@@ -153,18 +151,19 @@ const InputBorder: React.FC<InputBorderProps> = ({
           autoCapitalize="none"
           editable={!notChange}
           pointerEvents={pointerEvents}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
         />
         {touchEyes && (
-          <TouchableOpacity style={styles.iconPosition} onPress={onPressIcon}>
-            {secureVisible ? (
-              <Image source={AppIcons.eyesOpen} style={styles.iconEyes} />
-            ) : (
-              <Image style={styles.iconEyes} source={AppIcons.eyesClose} />
-            )}
+          <TouchableOpacity onPress={onPressIcon}>
+            <Image
+              source={secureVisible ? AppIcons.eyesOpen : AppIcons.eyesClose}
+              style={styles.iconEyes}
+            />
           </TouchableOpacity>
         )}
-        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };

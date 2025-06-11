@@ -127,8 +127,6 @@ const DetailTransaction: React.FC<DetailTransactionProps> = ({
     }
   }, [transactionData]);
 
-  console.log(transactionData);
-
   const styles = StyleSheet.create({
     view: {
       flex: 1,

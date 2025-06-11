@@ -51,8 +51,6 @@ const LanguageSetting: React.FC<LanguageSettingProps> = ({navigation}) => {
     );
   };
 
-  console.log(currentLanguage);
-
   const styles = StyleSheet.create({
     view: {
       flex: 1,

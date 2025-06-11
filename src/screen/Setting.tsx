@@ -48,7 +48,6 @@ const Setting: React.FC<SettingProps> = ({navigation}) => {
   //   modalizeRef.current?.close();
   // };
   const phoneNumber = '1234567890'; // Thay bằng số điện thoại bạn muốn
-  console.log(currentLanguage);
 
   const alertTexts = {
     title: {

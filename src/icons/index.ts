@@ -96,6 +96,7 @@ const icons: IconGroups = {
   media: {
     avatar: require('../../assets/images/avatar.jpg'),
     banner: require('../../assets/images/banner.jpg'),
+    bglogin: require('../../assets/images/bg-login.jpg'),
   },
 };
 

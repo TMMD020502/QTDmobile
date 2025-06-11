@@ -23,6 +23,7 @@ import {
   LoanSecurityType,
   LoanCollateralType,
 } from '../../api/types/loanRequest';
+import {CancelLoanResponse} from '../../api/types/loanInit';
 import {
   getworkflowbyapplicationid,
   loanRequest,
@@ -34,7 +35,7 @@ import CustomMultiSelect from '../CustomMultiSelect/CustomMultiSelect';
 import {
   CreateLoanResponse,
   History,
-  InterestType,
+  InterestCalculationType,
   LoanRequest,
 } from '../../api/types/loanworkflowtypes';
 import {useRoute} from '@react-navigation/native';
@@ -225,7 +226,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     note: '',
     monthlyIncome: 0,
     repaymentMethod: 'EQUAL_INSTALLMENTS',
-    interestType: 'FIXED',
+    interestCalculationType: 'FIXED',
     loanTerm: 12,
     interestRate: 0,
     metadata: {
@@ -247,11 +248,8 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
   } = useQuery<InterestRate[]>({
     queryKey: ['interestRates'],
     queryFn: async () => {
-      console.log('⏳ Starting interest rates fetch...');
       try {
         const response = await fetchInterestRates();
-        console.log('✅ Interest rates fetched:', response);
-        console.log('📊 Number of rates:', response?.length || 0);
         return response;
       } catch (err) {
         console.error('❌ Error fetching rates:', err);
@@ -263,14 +261,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
   });
 
   const loanTerms = useMemo(() => {
-    // Log current query state
-    console.log('🔄 Query Status:', queryStatus);
-    console.log('⌛ Loading:', isLoadingRates);
-    console.log('❌ Error:', error);
-
-    // Handle loading state
     if (isLoadingRates) {
-      console.log('⏳ Loading interest rates...');
       return defaultTerms;
     }
 
@@ -282,7 +273,6 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
 
     // Handle success state
     if (queryStatus === 'success' && Array.isArray(interestRates)) {
-      console.log('✅ Mapping interest rates to loan terms');
       return interestRates.map(rate => ({
         value: rate.term,
         label:
@@ -292,9 +282,6 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
         interest: rate.rate,
       }));
     }
-
-    // Fallback to default terms
-    console.log('⚠️ Using default terms');
     return defaultTerms;
   }, [
     interestRates,
@@ -313,8 +300,8 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
           appId,
         );
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
-            step => step.name === 'create-loan-request',
+          const createLoanStep = data.result[0].steps.find(
+            (step: {name: string}) => step.name === 'create-loan-request',
           );
 
           setTransactionId(createLoanStep?.transactionId ?? '');
@@ -355,9 +342,9 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
               monthlyIncome: metadata?.monthlyIncome || 0,
 
               // Loan terms and conditions
-              interestType:
-                (metadata?.interestType as InterestType) ||
-                ('' as InterestType),
+              interestCalculationType:
+                (metadata?.interestCalculationType as InterestCalculationType) ||
+                ('' as InterestCalculationType),
               loanTerm: metadata?.loanTerm || 12,
               interestRate: metadata?.interestRate || 0,
               repaymentMethod: metadata?.repaymentMethod || '',
@@ -373,8 +360,9 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
             };
           });
         }
-      } catch (error) {
-        console.error('Error fetching workflow:', error);
+      } catch (err) {
+        const cancelError = err as CancelLoanResponse;
+        console.error('Error fetching workflow: ', cancelError.message);
       }
     };
 
@@ -454,7 +442,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     }
 
     // Validate interest type
-    if (!formData.interestType) {
+    if (!formData.interestCalculationType) {
       newErrors.interestType =
         currentLanguage === 'vi'
           ? 'Vui lòng chọn loại lãi suất'
@@ -486,7 +474,6 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     return isValid;
   };
   const handleSubmit = async (_actionType: 'next' | 'update') => {
-    console.log('Form data:', formData);
     if (!validateForm()) {
       return;
     }
@@ -497,7 +484,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       const loanData = {
         monthlyIncome: formData.monthlyIncome,
         repaymentMethod: formData.repaymentMethod,
-        interestType: formData.interestType,
+        interestCalculationType: formData.interestCalculationType,
         loanTerm: formData.loanTerm,
         interestRate: selectedInterest,
         purpose: formData.purpose,
@@ -514,26 +501,23 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
 
       if (_actionType === 'next') {
         const response = await loanRequest(appId, loanData);
-        console.log('Create loan request ngoài' + response.result.id);
-        console.log('Loan request response:', response);
-        if (response.code === 201) {
+        if (response.code === 'S900030') {
           navigation.replace('CreateFinancialInfo', {appId});
         }
       } else if (_actionType === 'update') {
-        console.log('test');
         const response = await updateLoanRequest(
           appId,
           loanData,
           transactionId || '',
         );
-        console.log('Loan request response:', response);
-        if (response.code === 200) {
+        if (response.code === 'S900040') {
           navigation.goBack();
         }
       }
     } catch (err) {
+      const error = err as CancelLoanResponse;
       // Changed from error to err
-      console.log('Error creating loan request:', err.response);
+      console.error('Error creating loan request:', error.message);
       Alert.alert(
         currentLanguage === 'vi' ? 'Lỗi' : 'Error',
         currentLanguage === 'vi'
@@ -554,7 +538,6 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
     }));
 
     if (field === 'loanTerm') {
-      console.log('Interest rates:', interestRates);
       const selectedTerm = loanTerms.find(term => term.value === value);
       setSelectedInterest(selectedTerm?.interest || undefined);
     }
@@ -671,7 +654,6 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
       };
     });
   };
-
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <ScrollView
@@ -806,7 +788,7 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
             {currentLanguage === 'vi' ? 'Loại lãi suất' : 'Interest Type'}
           </Text>
           <DropdownComponent
-            value={formData.interestType}
+            value={formData.interestCalculationType}
             data={interestTypes} // Thay đổi từ borrowerTypes sang interestTypes
             placeholder={
               currentLanguage === 'vi'
@@ -814,7 +796,10 @@ const FormCreateLoanRequest: React.FC<FormCreateLoanRequestProps> = ({
                 : 'Select interest type'
             }
             onChange={(value: TargetItem) =>
-              handleOnchange('interestType', value.value as InterestType)
+              handleOnchange(
+                'interestCalculationType',
+                value.value as InterestCalculationType,
+              )
             }
           />
           {errors.interestType && (

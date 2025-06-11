@@ -16,11 +16,15 @@ export interface UserInit {
 }
 
 export interface LoanWorkflowResponse {
-  code: number;
+  code: string;
+  message: string;
+  result?: WorkflowResult[];
+}
+export interface LoanResponse {
+  code: string;
   message: string;
   result: WorkflowResult;
 }
-
 export interface WorkflowResult {
   id: string;
   createdAt: string | null;
@@ -29,7 +33,7 @@ export interface WorkflowResult {
   createdBy: string;
   targetId: string;
   prevSteps: StepName[];
-  currentSteps: StepName[];
+  activeSteps: StepName[];
   nextSteps: StepName[];
   workflowStatus: WorkflowStatus;
   startTime: string;

@@ -43,7 +43,7 @@ const Notification: React.FC<NotificationProps> = ({navigation}) => {
         const response = await getNotifications();
         console.log(response);
       } catch (error) {
-        console.log(error);
+        console.error(error);
       }
     };
     fetchData();

@@ -106,7 +106,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
   const [selectedFiles, setSelectedFiles] = useState<
     ExtendedDocumentPickerResponse[]
   >([]);
-  console.log('selectedFiles:', formData);
   // const [savedFile, setSavedFile] = useState(null);
   const handleViewFile = async (fileUri: string) => {
     try {
@@ -121,16 +120,10 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
     const res = await DocumentPicker.pick({
       type: [DocumentPicker.types.allFiles], // Chọn loại tệp bạn muốn cho phép
     });
-    console.log('Selected file1:', res[0]);
     const File: ExtendedDocumentPickerResponse = {
       ...res[0],
       source: 'local', // Đánh dấu file từ thiết bị
     };
-    /*
-      const fileUri =
-        Platform.OS === 'android' && !res[0].uri.startsWith('file://')
-          ? `file://${res[0].uri}`
-          : res[0].uri;*/
     const file = {
       uri: res[0].uri,
       type: res[0].type || 'application/octet-stream',
@@ -138,14 +131,9 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       source: 'local',
       typeapi: 'FINANCIAL_INFO',
     };
-    console.log('Formdata:' + JSON.stringify(file));
     const uploadResponse = await uploadImage(file);
 
     if (uploadResponse) {
-      // 🎯 Hiển thị đầy đủ thông tin phản hồi
-      console.log('✅ Response:', uploadResponse);
-      console.log('📌 Id:', uploadResponse.id);
-
       setSelectedFiles(prev => [...prev, File]);
 
       formikRef.current?.setFieldValue('files', [
@@ -169,20 +157,11 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
 
       const {actionType, ...filteredValues} = values;
       if (actionType === 'next') {
-        /*
-        if ((formikRef.current?.values.files || []).length === 0) {
-          Alert.alert('Lỗi', 'Vui lòng chọn ít nhất một file.');
-          return;
-        }
-*/
-        console.log('Files before API call:', formikRef.current?.values);
-        console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
         const response = await financialInfo(appId, filteredValues);
         if (response.code === 200) {
           navigation.replace('LoadingWorkflowLoan', {appId});
         }
       } else if (actionType === 'update') {
-        console.log('Filtered JSON:', JSON.stringify(filteredValues, null, 2));
         const response = await updateFinancialInfo(
           appId,
           filteredValues,
@@ -193,7 +172,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
         }
       }
     } catch (error) {
-      console.log('Error submitting financial info:', error);
+      console.error('Error submitting financial info:', error);
       Alert.alert(
         t('notification.title'),
         t('formCreateLoan.financialInfo.submitError'),
@@ -390,7 +369,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
           appId,
         );
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
+          const createLoanStep = data.result[0].steps.find(
             step => step.name === 'create-financial-info',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
@@ -434,25 +413,19 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
               // Fetch and format documents if files exist
               // Inside useEffect
               if (financialData.files?.length > 0) {
-                try {
-                  console.log('Files to fetch:', financialData.files);
+                try{
                   const documents = await getDocuments(financialData.files);
-                  console.log('Raw documents response:', documents);
-
                   if (Array.isArray(documents) && documents.length > 0) {
                     const formattedFiles = documents
                       .filter(
                         (doc): doc is ApiResponse<UploadResponseResult> => {
                           if (!doc || !doc.result) {
-                            console.log('Filtering out invalid doc:', doc);
                             return false;
                           }
                           return true;
                         },
                       )
                       .map((doc: ApiResponse<UploadResponseResult>) => {
-                        // Thêm log để debug
-                        console.log('Mapping doc:', doc);
                         return {
                           uri: doc.result.url || '',
                           type: doc.result.type || 'application/octet-stream',
@@ -462,8 +435,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
                           source: 'server' as const,
                         };
                       });
-
-                    console.log('Formatted files:', formattedFiles);
                     if (formattedFiles.length > 0) {
                       setSelectedFiles(formattedFiles);
                       // Also update Formik files array
@@ -495,7 +466,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
       initialValues={{...formData, actionType: ''}}
       validationSchema={validationSchema}
       onSubmit={values => {
-        console.log('Formik onSubmit called with values:', values);
         handleSubmit(values, values.actionType);
       }}
       innerRef={formikRef}>
@@ -507,7 +477,7 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
         touched,
         setFieldValue,
       }) => {
-        console.log('Formik errors:', errors);
+        console.error('Formik errors:', errors);
         return (
           <TouchableWithoutFeedback
             onPress={Keyboard.dismiss}
@@ -758,7 +728,6 @@ const FormCreateFinancialInfo: React.FC<FormCreateFinancialInfoProps> = ({
                   <TouchableOpacity
                     style={[styles.btn, isLoading && {opacity: 0.7}]}
                     onPress={async () => {
-                      console.log('Button pressed');
                       setFieldValue('actionType', 'update');
                       formikHandleSubmit();
                     }}

@@ -58,15 +58,9 @@ const LoadingWorkflowLoan: React.FC<LoadingWorkflowLoanProps> = ({
     currentSteps: string[],
     nextSteps: string[],
   ): ScreenName => {
-    console.log('Finding next screen with:', {
-      prevSteps,
-      currentSteps,
-      nextSteps,
-    });
 
     // If no initialization yet, go to IntroduceLoan
     if (!prevSteps.includes('init')) {
-      console.log('Init not done yet, showing IntroduceLoan');
       return 'IntroduceLoan';
     }
 
@@ -76,33 +70,22 @@ const LoadingWorkflowLoan: React.FC<LoadingWorkflowLoanProps> = ({
       const nextScreenNames = nextSteps
         .map(step => stepToScreenMap[step as StepName])
         .filter(Boolean);
-
-      console.log('Next screen names:', nextScreenNames);
-
       // Check if any nextScreens match our sortScreen order
       const validNextScreens = nextScreenNames.filter(screen =>
         sortScreen.includes(screen as string),
       );
-
-      console.log('Valid next screens:', validNextScreens);
-
       // If none of the nextScreens match our sortScreen, go to InfoCreateLoan
       if (validNextScreens.length === 0) {
-        console.log('No valid next screens, showing InfoCreateLoan');
         return 'InfoCreateLoan';
       }
 
       // Find the first screen in our sort order that appears in nextScreens
       for (const screenName of sortScreen) {
         if (nextScreenNames.includes(screenName as ScreenName)) {
-          console.log(`Found next screen in sort order: ${screenName}`);
           return screenName as ScreenName;
         }
       }
     }
-
-    // If there are no next steps, we've completed everything
-    console.log('No next steps available, showing InfoCreateLoan');
     return 'InfoCreateLoan';
   };
 
@@ -156,14 +139,12 @@ const LoadingWorkflowLoan: React.FC<LoadingWorkflowLoanProps> = ({
         // Check for token first
         const token = await getAccessToken();
         if (!token) {
-          console.log('No token found, redirecting to login');
           navigation.replace('Login');
           return;
         }
 
         // Check if user exists
         if (!user?.id) {
-          console.log('No user found');
           navigation.replace('Login');
           return;
         }
@@ -172,52 +153,58 @@ const LoadingWorkflowLoan: React.FC<LoadingWorkflowLoanProps> = ({
         const appId = await getApplication(user.id);
         if (!appId?.id) {
           if (retryCount < 1) {
-            console.log('Application not found, retrying...');
             setTimeout(() => checkWorkflowStatus(retryCount + 1), 1000);
             return;
           }
-          console.log('Application not found after retry');
           navigation.replace('IntroduceLoan');
           return;
         }
 
         // Fetch workflow status with retry
         const response = await fetchWorkflowStatus(appId.id);
-        if (!response || response.code !== 200) {
+        if (!response.result || response.code !== 'S000001') {
           if (retryCount < 1) {
-            console.log('Workflow status failed, retrying...');
             setTimeout(() => checkWorkflowStatus(retryCount + 1), 1000);
             return;
           }
-          console.log('Workflow status failed after retry');
           navigation.replace('IntroduceLoan');
           return;
         }
-        console.log('Workflow status:', response);
+        if (response.result.length === 0) {
+          navigation.replace('IntroduceLoan');
+          return;
+        }
+        let index = 0;
+        let stepsObj = response.result[index];
 
-        const {prevSteps, currentSteps, nextSteps} = response.result;
-        const nextScreen = findNextScreen(
-          prevSteps || [],
-          currentSteps || [],
-          nextSteps || [],
-        );
+        // Lặp qua các phần tử cho đến khi tìm được phần tử có ít nhất 1 trường không null/undefined
+        while (
+          stepsObj &&
+          (!stepsObj.prevSteps || stepsObj.prevSteps.length === 0) &&
+          (!stepsObj.activeSteps || stepsObj.activeSteps.length === 0) &&
+          (!stepsObj.nextSteps || stepsObj.nextSteps.length === 0) &&
+          index < response.result.length - 1
+        ) {
+          index += 1;
+          stepsObj = response.result[index];
+        }
+
+        // Nếu không tìm được, gán mặc định là mảng rỗng
+        const {prevSteps, activeSteps, nextSteps} = stepsObj || {};
+        const nextScreen = findNextScreen(prevSteps, activeSteps, nextSteps);
 
         // Save currentStep to AsyncStorage if available, otherwise use first nextStep
         if (nextSteps && nextSteps.length > 0) {
           await AsyncStorage.setItem('currentStep', nextSteps[0]);
-        } else if (currentSteps && currentSteps.length > 0) {
-          await AsyncStorage.setItem('currentStep', currentSteps[0]);
+        } else if (activeSteps && activeSteps.length > 0) {
+          await AsyncStorage.setItem('currentStep', activeSteps[0]);
         }
-
-        console.log('Navigating to:', nextScreen);
         navigateToScreen(nextScreen, appId.id);
       } catch (error) {
         if (retryCount < 1) {
-          console.log('Error occurred, retrying...', error);
           setTimeout(() => checkWorkflowStatus(retryCount + 1), 1000);
           return;
         }
-        console.log('Error occurred after retry:', error);
         navigation.replace('Login');
       }
     };

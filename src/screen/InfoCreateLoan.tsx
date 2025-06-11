@@ -37,8 +37,6 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
   const {isDarkMode, theme} = useTheme();
   const {appId} = route.params;
 
-  console.log('appId', appId);
-
   const {
     data: workflowData,
     isLoading,
@@ -48,10 +46,24 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
     queryFn: async () => {
       try {
         const response = await fetchWorkflowStatus(appId);
-        if (!response || response.code !== 200) {
+        if (!response.result || response.code !== 'S000001') {
           throw new Error('Failed to fetch workflow status');
         }
-        return response.result;
+        let index = 0;
+        let stepsObj = response.result[index];
+
+        // Lặp qua các phần tử cho đến khi tìm được phần tử có ít nhất 1 trường không null/undefined
+        while (
+          stepsObj &&
+          (!stepsObj.prevSteps || stepsObj.prevSteps.length === 0) &&
+          (!stepsObj.activeSteps || stepsObj.activeSteps.length === 0) &&
+          (!stepsObj.nextSteps || stepsObj.nextSteps.length === 0) &&
+          index < response.result.length - 1
+        ) {
+          index += 1;
+          stepsObj = response.result[index];
+        }
+        return stepsObj;
       } catch (error) {
         console.error('Error fetching workflow status:', error);
         throw error;
@@ -93,7 +105,7 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
               await cancelLoan(appId);
               navigation.goBack();
             } catch (error) {
-              console.log('Error canceling loan:', error);
+              console.error('Error canceling loan:', error);
               // Handle error if needed
             }
           },
@@ -317,7 +329,6 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
 
   // Hàm hiển thị dialog khi nhấn vào step
   const handleStepPress = (step: string, status: string) => {
-    console.log('Step' + step);
     if (step === 'create-loan-request') {
       navigation.navigate('CreateLoanRequest', {
         appId,
@@ -401,8 +412,8 @@ const InfoCreateLoan: React.FC<InfoCreateLoanProps> = ({navigation, route}) => {
               filterAllowedSteps(workflowData.prevSteps).map(step =>
                 renderStep(step, 'completed'),
               )}
-            {workflowData?.currentSteps &&
-              filterAllowedSteps(workflowData.currentSteps).map(step =>
+            {workflowData?.activeSteps &&
+              filterAllowedSteps(workflowData.activeSteps).map(step =>
                 renderStep(step, 'processing'),
               )}
             {workflowData?.nextSteps &&

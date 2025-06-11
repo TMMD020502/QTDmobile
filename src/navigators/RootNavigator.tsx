@@ -1,4 +1,3 @@
-/* eslint-disable react/react-in-jsx-scope */
 import {Text, View, Image, StyleSheet, ImageSourcePropType} from 'react-native';
 import {
   NavigationContainer,

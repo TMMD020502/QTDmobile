@@ -8,7 +8,6 @@ export const getUserData = async (): Promise<User> => {
     const response = await axiosInstance.get<ApiResponse<User>>(
       ApiEndpoints.GET_USER_PROFILE
     );
-    console.log('User data:', response.data.result);
     return response.data.result;
   } catch (error) {
     console.error('Error fetching user data:', (error as any).response);

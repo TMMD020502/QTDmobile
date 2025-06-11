@@ -43,9 +43,6 @@ const InfoLoan: React.FC<InfoLoanProps> = ({navigation, route}) => {
   );
   const {theme} = useTheme() as {theme: Theme};
   const {t} = useTranslation();
-
-  console.log('InfoLoan: ', data);
-
   const styles = StyleSheet.create({
     view: {
       flex: 1,

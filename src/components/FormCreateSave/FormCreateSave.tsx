@@ -91,31 +91,9 @@ const FormCreateSave: React.FC = () => {
       [field]: value,
     }));
   };
-  // console.log('Form data:', formData);
-
-  // react query call api
-
-  // const userId = 1;
-  // const {data, status, error, isLoading} = useQuery({
-  //   queryKey: ['users'],
-  //   queryFn: () => getUsers(),
-  //   onSuccess: data => {
-  //     console.log('Successfully fetched users:', data);
-  //   },
-  //   onError: error => {
-  //     Alert.alert('Error', 'Failed to fetch data. Please try again later.', [
-  //       {text: 'OK'},
-  //     ]);
-  //   },
-  //   retry: 2,
-  //   staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-  // });
-
-  // console.log('Data:', data);
 
   const submit = (e: GestureResponderEvent) => {
     e.preventDefault();
-    console.log('Form data:', formData);
   };
 
   const styles = StyleSheet.create({

@@ -123,7 +123,7 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
       try {
         const data = await getworkflowbyapplicationid<MachineryFormData>(appId);
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
+          const createLoanStep = data.result[0].steps.find(
             step => step.name === 'add-asset-collateral',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
@@ -277,8 +277,6 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
           navigation.replace('CreditRating', {appId});
         }
       } else {
-        console.log('formData', JSON.stringify(formData, null, 2));
-
         const response = await updateAssetCollateral(
           appId,
           formData,
@@ -290,7 +288,7 @@ const FormMachineryFields: React.FC<FormMachineryFieldsProps> = ({
       }
     } catch (error) {
       const apiError = error as ApiErrorResponse;
-      console.log('Error submitting:', apiError);
+      console.error('Error submitting:', apiError);
       if (
         apiError?.message ===
         'Dependency step not completed (create-loan-request:inprogress)'

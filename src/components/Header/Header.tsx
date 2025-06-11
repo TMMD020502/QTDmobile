@@ -24,7 +24,6 @@ const Header: React.FC<HeaderProps> = ({Navbar, navigation, name}) => {
   };
 
   useEffect(() => {
-    console.log('Header rendered:', Navbar);
   }, [Navbar]);
 
   const styles = StyleSheet.create({

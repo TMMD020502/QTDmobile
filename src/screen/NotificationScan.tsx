@@ -31,7 +31,6 @@ const NotificationScan: React.FC<NotificationScanProps> = ({navigation, route}) 
   const {formDataAddress, formDataUser} = route.params; // Lấy formData từ Register
   const {t} = useTranslation();
   const {theme} = useTheme();
-  console.log('Notification formData:', formDataAddress); // Debug log
 
   return (
     <SafeAreaView style={[styles.view, {backgroundColor: theme.background}]}>

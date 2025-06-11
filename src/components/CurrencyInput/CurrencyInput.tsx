@@ -56,7 +56,7 @@ const CurrencyInput: React.FC<CurrencyInputProps> = ({
 
       // Add thousand separators based on language
       let result = '';
-
+      //result = wholePart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       // Add thousand separators to whole part
       if (currentLanguage === 'vi') {
         // Vietnamese format: use comma (,) as thousand separator

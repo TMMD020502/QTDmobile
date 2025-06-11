@@ -45,7 +45,6 @@ class ErrorBoundary extends React.Component<
   render(): React.ReactNode {
     if (this.state.hasError) {
       return (
-        // eslint-disable-next-line react-native/no-inline-styles
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           <Text>Something went wrong with authentication.</Text>
         </View>

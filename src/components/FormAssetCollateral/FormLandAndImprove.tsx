@@ -129,14 +129,12 @@ const FormLandAndImprove: React.FC<FormLandAndImproveProps> = ({
       },
     },
   });
-
-  console.log('formData', formData);
   useEffect(() => {
     const fetchData = async () => {
       try {
         const data = await getworkflowbyapplicationid<LandAndImprovementFormData>(appId);
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
+          const createLoanStep = data.result[0].steps.find(
             step => step.name === 'add-asset-collateral',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
@@ -283,8 +281,6 @@ const FormLandAndImprove: React.FC<FormLandAndImproveProps> = ({
           navigation.replace('InfoCreateLoan', {appId});
         }
       } else {
-        console.log('formData', JSON.stringify(formData, null, 2));
-
         const response = await updateAssetCollateral(
           appId,
           formData,
@@ -296,7 +292,7 @@ const FormLandAndImprove: React.FC<FormLandAndImproveProps> = ({
       }
     } catch (error) {
       const apiError = error as ApiErrorResponse;
-      console.log('Error submitting:', apiError);
+      console.error('Error submitting:', apiError);
       if (
         apiError?.message ===
         'Dependency step not completed (create-loan-request:inprogress)'

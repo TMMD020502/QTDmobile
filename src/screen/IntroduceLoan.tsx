@@ -56,7 +56,6 @@ const IntroduceLoan: React.FC<IntroduceLoanProps> = ({navigation}) => {
   const {theme} = useTheme();
 
   const user = useSelector((state: RootState) => state.user.userData);
-  console.log('user', user);
 
   const content: Record<'vi' | 'en', ContentType> = {
     vi: {
@@ -226,13 +225,14 @@ const IntroduceLoan: React.FC<IntroduceLoanProps> = ({navigation}) => {
   });
 
   const handleApply = async () => {
-    if (!isAccepted || isLoading || !user?.id) return;
+    if (!isAccepted || isLoading || !user?.id) {
+      return;
+    }
 
     try {
       setIsLoading(true);
       const response = await initLoan({userId: user.id});
-
-      if (response.code === 200) {
+      if (response.code === 'S000002') {
         navigation.replace('LoadingWorkflowLoan');
       }
     } catch (error) {
@@ -240,7 +240,7 @@ const IntroduceLoan: React.FC<IntroduceLoanProps> = ({navigation}) => {
         'Lỗi',
         'Không thể đăng ký khoản vay mới. \n Vui lòng liên hệ quầy để hỗ trợ',
       );
-      console.log('Error initializing loan:', error);
+      console.error('Error initializing loan:', error);
     } finally {
       setIsLoading(false);
     }

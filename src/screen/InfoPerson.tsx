@@ -59,7 +59,6 @@ const InfoPerson: React.FC<InfoPersonProps> = ({navigation}) => {
   });
   const {theme} = useTheme();
   const user = useSelector((state: RootState) => state.user.userData);
-  console.log('user', user);
   const tabs: TabItem[] = [
     {key: 'info', label: (t('info.infoContact') as string).toUpperCase()},
     {key: 'paper', label: (t('info.identityDocument') as string).toUpperCase()},

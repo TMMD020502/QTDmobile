@@ -9,13 +9,13 @@ export const getNotifications = async (): Promise<
 > => {
   try {
     const response = await axiosInstance.get<NotificationResponse>(
-      `/employee-notifications/my-notifications`,
+      '/employee-notifications/my-notifications',
     );
 
     return response.data.result.content;
   } catch (error: any) {
-    console.log('Error fetching notification:', error);
-    console.log('Error fetching notification:', error.response);
+    console.error('Error fetching notification:', error);
+    console.error('Error fetching notification:', error.response);
     return undefined;
   }
 };

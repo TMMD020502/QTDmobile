@@ -24,7 +24,6 @@ export const uploadImage = async (file: UploadFile): Promise<UploadRequest> => {
     if (!file?.fileName) {
       throw new UploadError('File không hợp lệ');
     }
-    console.log('File 2 :', file);
     const formData = new FormData();
     formData.append('file', {
       uri: file.uri,
@@ -32,15 +31,6 @@ export const uploadImage = async (file: UploadFile): Promise<UploadRequest> => {
       name: file.fileName,
     } as any);
     formData.append('type', file.typeapi);
-    console.log('FormData:' + JSON.stringify(file));
-    const logFormData = (formData: FormData) => {
-      console.log('🧾 FormData contents:');
-      (formData as any)._parts?.forEach((part: any) => {
-        console.log(`${part[0]}:`, part[1]);
-      });
-    };
-
-    logFormData(formData);
 
     const response = await axiosInstance.post<ApiResponse<UploadRequest>>(
       ApiEndpoints.UPLOAD_IMAGE,
@@ -133,13 +123,11 @@ export const uploadImage = async (file: UploadFile): Promise<UploadRequest> => {
 export const getDocuments = async (
   documentIds: string[],
 ): Promise<ApiResponse<UploadResponseResult>[]> => {
-  // Thay đổi return type
-  console.log('duyệt qua ', documentIds);
+
   try {
-    console.log('📄 Bắt đầu gọi tài liệu với các ID:', documentIds);
 
     if (!Array.isArray(documentIds) || documentIds.length === 0) {
-      console.log('⚠️ Không có ID nào được cung cấp');
+      console.error('⚠️ Không có ID nào được cung cấp');
       return [];
     }
 
@@ -150,8 +138,6 @@ export const getDocuments = async (
         const response = await axiosInstance.get<ApiResponse<UploadResponseResult>>(
           `/documents/${documentId}`,
         );
-        console.log(`✅ Đã lấy tài liệu ${documentId}:`, response.data);
-
         if (response.data) {
           results.push(response.data); // Thay đổi ở đây
         } else {
@@ -162,8 +148,6 @@ export const getDocuments = async (
         continue;
       }
     }
-
-    console.log('📦 Tài liệu hợp lệ:', results);
     return results;
   } catch (error: any) {
     console.error('❌ Lỗi tổng quát trong getDocuments:', error);
@@ -176,18 +160,14 @@ export const fetchImage = async (fileUri: string): Promise<string> => {
   try {
     // Loại bỏ phần "/api/v1" từ fileUri
     const sanitizedUri = fileUri.replace('/api/v1', '');
-    console.log('Sanitized URI:', sanitizedUri);
-
     // Make the GET request
     const response = await axiosInstance.get(sanitizedUri, {
       responseType: 'arraybuffer',
       timeout: 30000, // Set a timeout for the request
     });
-    console.log('2');
 
     // Convert the array buffer to Base64
     const base64Image = `data:image/jpeg;base64,${encode(response.data)}`;
-    console.log('Fetched base64 image:', base64Image);
 
     return base64Image;
   } catch (error: any) {

@@ -4,6 +4,7 @@ import {
   FinancialInfoResponse,
 } from '../types/financialInfo';
 import {
+  LoanResponse,
   LoanWorkflowResponse,
   UserInit,
   CancelLoanResponse,
@@ -18,7 +19,7 @@ export const initLoan = async (
   params: UserInit,
 ): Promise<LoanWorkflowResponse> => {
   const response = await axiosInstance.post(
-    `/applications?customerId=${params.userId}`,
+    `/applications?customerId=${params.userId}&stepPath=loan-application-workflow.init`,
     {
       userId: params.userId,
     },
@@ -40,7 +41,7 @@ export const fetchInterestRates = async (): Promise<InterestRate[]> => {
   try {
     await new Promise(resolve => setTimeout(resolve, 500)); // Add 5s delay
     const response = await axiosInstance.get(
-      `/settings/interest-rate-settings?filter=type:'LOAN'`,
+      "/settings/interest-rate-settings?filter=type:'LOAN'",
     );
     return response.data.result.content || [];
   } catch (error) {
@@ -53,7 +54,7 @@ export const fetchInterestRates = async (): Promise<InterestRate[]> => {
 export const loanRequest = async (
   applicationId: string,
   loanData: Omit<LoanRequest, 'application'>,
-): Promise<LoanWorkflowResponse> => {
+): Promise<LoanResponse> => {
   try {
     const requestBody: LoanRequest = {
       ...loanData,
@@ -61,14 +62,12 @@ export const loanRequest = async (
         id: applicationId,
       },
     };
-    console.log('APPLICATIONID' + applicationId);
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+    console.log('LoanRequest APPLICATIONID ' + applicationId);
 
     const response = await axiosInstance.post(
-      `/loan-requests?applicationId=${applicationId}`,
+      `/loan-requests?applicationId=${applicationId}&stepPath=loan-applicaion-workflow.create-loan-request`,
       requestBody,
     );
-    console.log('Loan request successful:', response.data);
     return response.data;
   } catch (error: any) {
     if (error.response) {
@@ -98,17 +97,14 @@ export const loanRequest = async (
       id: '',
       status: 'failed',
     },
-  } as unknown as LoanWorkflowResponse;
+  } as unknown as LoanResponse;
 };
 
 export const updateLoanRequest = async (
   applicationId: string,
-  loanData: Omit<LoanRequest, 'application'>, // Không cần applicationId
+  loanData: Omit<LoanRequest, 'application'>,
   transactionId: string,
 ): Promise<LoanWorkflowResponse> => {
-  // Loại bỏ asset trước khi tạo requestBody
-  //const filteredLoanData = {...loanData};
-  //delete (filteredLoanData as any).asset;
   const requestBody: LoanRequest = {
     //...filteredLoanData,
     ...loanData,
@@ -116,14 +112,14 @@ export const updateLoanRequest = async (
       id: applicationId,
     },
   };
-  console.log('APPLICATIONID' + applicationId);
+  console.log('UpdateLoanRequest APPLICATIONID ' + applicationId);
 
   try {
     const response = await axiosInstance.put(
       `/loan-requests/${transactionId}`,
       requestBody,
     );
-    console.log('API Response:', response.data);
+
     return response.data;
   } catch (error: any) {
     if (error.response) {
@@ -148,38 +144,27 @@ export const updateLoanRequest = async (
   } as unknown as LoanWorkflowResponse;
 };
 
+// export const fetchWorkflowStatus = async (
+//   applicationId: string,
+// ): Promise<LoanWorkflowResponse> => {
+//   await new Promise(resolve => setTimeout(resolve, 500)); // Add 5s delay
+//   const response = await axiosInstance.get(
+//     `/onboarding-workflows/${applicationId}`,
+//   );
+//   return response.data;
+// };
+
 export const getworkflowbyapplicationid = async <T>(
   applicationId: string,
 ): Promise<LoanWorkflowResponseS<T>> => {
   // Loại bỏ asset trước khi tạo requestBody
-  try {
-    console.log('APPLICATIONID' + applicationId);
-    const response = await axiosInstance.get(
-      `/onboarding-workflows/${applicationId}`,
-    );
-    console.log('API Response:', response.data);
-    return response.data;
-  } catch (error: any) {
-    if (error.response) {
-      // Lỗi từ phía server (4xx, 5xx)
-      console.error(
-        'Lỗi từ server:',
-        error.response.status,
-        error.response.data,
-      );
-      // Trả về một giá trị mặc định thay vì undefined
-      return error.response.data;
-    }
-  }
-  return {
-    code: 'ERROR',
-    message: 'Lỗi kết nối hoặc lỗi không xác định',
-    result: {
-      id: '',
-      status: 'failed',
-    },
-  } as unknown as LoanWorkflowResponseS<T>;
+  console.log('Getworkflowbyapplicationid APPLICATIONID ' + applicationId);
+  const response = await axiosInstance.get(
+    `/onboarding-workflows/${applicationId}`,
+  );
+  return response.data;
 };
+
 //Creat_loan_plan
 export const loanPlan = async (
   applicationId: string,
@@ -209,7 +194,7 @@ export const updateLoanPlan = async (
       id: applicationId,
     },
   };
-  console.log('APPLICATIONID ' + applicationId);
+  console.log('UpdateLoanPlan APPLICATIONID ' + applicationId);
   const response = await axiosInstance.put(
     `/loan-plans/${transactionId}`,
     requestBody,
@@ -227,10 +212,9 @@ export const financialInfo = async (
       id: applicationId,
     },
   };
-  console.log('APPLICATIONID' + applicationId);
-  console.log('Filtered JSON:', JSON.stringify(requestBody, null, 2));
+  console.log('FinancialInfo APPLICATIONID' + applicationId);
   const response = await axiosInstance.post(
-    `/financial-infos?applicationId=${applicationId}`,
+    `/financial-infos?applicationId=${applicationId}&stepPath=loan-application-workflow.create-financial-info`,
     requestBody,
   );
   return response.data;
@@ -265,10 +249,6 @@ export const addAssetCollateral = async (
       ...asset,
       application: {id: applicationId},
     }));
-    console.log(
-      'Assets with application: ',
-      JSON.stringify(assetsWithApplication, null, 2),
-    );
     const response = await axiosInstance.post(
       `/assets?applicationId=${applicationId}`,
       assetsWithApplication,
@@ -303,10 +283,6 @@ export const updateAssetCollateral = async (
       ...asset,
       application: {id: applicationId},
     }));
-    console.log(
-      'Assets update with application: ',
-      JSON.stringify(assetsWithApplication, null, 2),
-    );
     const response = await axiosInstance.put(
       `/assets/${transactionId}`,
       assetsWithApplication,

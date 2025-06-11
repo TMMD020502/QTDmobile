@@ -251,7 +251,6 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
       {setSubmitting}: {setSubmitting: (isSubmitting: boolean) => void},
     ) => {
       try {
-        console.log('Registering with data:', values); // Debug log
         const userData = {
           ...values,
           phone: formDataUser.phone,
@@ -260,7 +259,6 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
           address: JSON.stringify(formDataAddress), // Convert address to string
         };
         const result = await register(userData);
-        console.log('Register result:', result); // Debug log
         if (result) {
           navigation.reset({
             index: 0,
@@ -402,15 +400,12 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
 
               try {
                 const response = await launchImageLibrary(options);
-                console.log('Image picker response:', response); // Debug log
 
                 if (response.didCancel) {
-                  console.log('User cancelled image picker');
                   return;
                 }
 
                 if (response.errorCode) {
-                  console.log('ImagePicker Error:', response.errorMessage);
                   Alert.alert(
                     t('register.resultScreen.title'),
                     t('register.resultScreen.imageError'),
@@ -433,8 +428,6 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
                       typeapi: type,
                     });
                     const imageUrl = uploadResult.url; // Adjust based on your API response
-
-                    console.log('Uploaded image URL:', imageUrl); // Debug log
                     // Update state and form values with server URL
                     switch (type) {
                       case 'signature':
@@ -451,10 +444,6 @@ const ResultQR: React.FC<ResultQRProps> = ({navigation, route}) => {
                         break;
                     }
                   } catch (uploadError) {
-                    // console.error(
-                    //   'Error uploading image:',
-                    //   uploadError.message || uploadError,
-                    // );
                     Alert.alert(
                       t('register.resultScreen.title'),
                       t('register.resultScreen.imageError'),

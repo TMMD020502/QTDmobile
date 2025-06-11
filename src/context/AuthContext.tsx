@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         setIsAuthenticated(false);
       }
     } catch (err: any) {
-      console.log('Auth state check failed:', JSON.stringify(err.response));
+      console.error('Auth state check failed:', JSON.stringify(err.response));
       setIsAuthenticated(false);
       setError('Authentication check failed');
     } finally {
@@ -72,11 +72,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         await authService.logout();
         // setIsAuthenticated(false);
       } catch (err) {
-        // Vẫn set isAuthenticated về false ngay cả khi có lỗi
-        // vì người dùng có ý định logout
         setIsAuthenticated(false);
         setError('Có lỗi xảy ra khi đăng xuất');
-        console.log('Logout error:', JSON.stringify(err));
+        console.error('Logout error:', JSON.stringify(err));
       }
     },
     refreshToken: async () => {

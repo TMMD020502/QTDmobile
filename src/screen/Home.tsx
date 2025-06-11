@@ -38,23 +38,16 @@ const Home: React.FC<HomeProps> = ({navigation}) => {
     useCallback(() => {
       const checkTokenAndLoadData = async () => {
         try {
-          console.log('Checking token and loading data');
           if (!isAuthenticated) {
-            console.log('User is not authenticated, navigating to Login');
             navigation.replace('Login');
             return;
           }
 
           const token = await getAccessToken();
-          console.log('Token: ', token);
 
           if (token && isTokenExpired(token)) {
-            console.log('Token is expired, attempting to refresh');
             const refreshed = await refreshToken();
-            console.log('Refresh result:', refreshed);
-
             if (!refreshed) {
-              console.log('Token refresh failed, navigating to Login');
               Alert.alert(
                 'Session Expired',
                 'Your session has expired. Please login again.',
@@ -68,8 +61,6 @@ const Home: React.FC<HomeProps> = ({navigation}) => {
               return;
             }
           }
-
-          console.log('Token is valid, loading data');
           await loadData();
         } catch (error) {
           console.error('Error in checkTokenAndLoadData:', error);
@@ -82,11 +73,9 @@ const Home: React.FC<HomeProps> = ({navigation}) => {
   );
 
   const loadData = async (): Promise<void> => {
-    console.log('Loading user data');
     try {
       dispatch(setLoading(true));
       const result = await getUserData();
-      console.log('Result: ', result);
       if (result) {
         dispatch(setUserData(result));
       }
@@ -97,22 +86,17 @@ const Home: React.FC<HomeProps> = ({navigation}) => {
       Alert.alert('Error', errorMessage);
     }
   };
-  console.log('HomePage: ', isAuthenticated);
-  console.log('Data: ', userData);
 
   return (
     <SafeAreaView style={[styles.view, {backgroundColor: theme.background}]}>
       <View style={styles.container}>
         {/* Heading */}
-
         <Header
           Navbar="Home"
           navigation={navigation}
           name={userData?.identityInfo?.fullName}
         />
-
         {/* Body */}
-
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}>

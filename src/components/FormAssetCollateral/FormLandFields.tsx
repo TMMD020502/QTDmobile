@@ -113,7 +113,7 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({theme, navigation}) => {
       try {
         const data = await getworkflowbyapplicationid<LandFormData>(appId);
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
+          const createLoanStep = data.result[0].steps.find(
             step => step.name === 'add-asset-collateral',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
@@ -219,8 +219,6 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({theme, navigation}) => {
   );
   const [tempDate, setTempDate] = useState(new Date());
 
-  console.log('formData', formData);
-
   const styles = createStyles(theme);
 
   const handleChange = (field: string, value: any) => {
@@ -271,8 +269,6 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({theme, navigation}) => {
           navigation.replace('CreditRating', {appId});
         }
       } else {
-        console.log('formData', JSON.stringify(formData, null, 2));
-
         const response = await updateAssetCollateral(
           appId,
           formData,
@@ -284,7 +280,6 @@ const FormLandFields: React.FC<FormLandFieldsProps> = ({theme, navigation}) => {
       }
     } catch (error) {
       const apiError = error as ApiErrorResponse;
-      console.log('Error submitting:', apiError);
       if (
         apiError?.message ===
         'Dependency step not completed (create-loan-request:inprogress)'

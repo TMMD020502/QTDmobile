@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import React, {useState} from 'react';
 import {AppIcons} from '../icons';
@@ -16,6 +17,7 @@ import InputBorder from '../components/InputBorder/InputBorder';
 import {useTranslation} from 'react-i18next';
 import {useAuth} from '../context/AuthContext';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import LogoSvg from '../components/ConfigSvg/LogoSvg';
 
 interface LoginProps {
   navigation: NativeStackNavigationProp<any>;
@@ -79,12 +81,9 @@ const Login: React.FC<LoginProps> = ({navigation}) => {
       Alert.alert(t('notification.title'), t('login.errors.passwordLength'));
       return;
     }
-    console.log('Login:', username, password);
     const result = await login(username, password);
-
-    console.log('Result: ', JSON.stringify(result));
     if (result === true) {
-      // navigation.navigate('HomeTabs');
+      //navigation.navigate('HomeTabs');
     } else {
       Alert.alert(
         t('notification.title'),
@@ -95,7 +94,7 @@ const Login: React.FC<LoginProps> = ({navigation}) => {
 
   const styles = StyleSheet.create({
     view: {
-      flex: 1,
+      flex: 2,
       backgroundColor: theme.background,
     },
     container: {
@@ -104,16 +103,24 @@ const Login: React.FC<LoginProps> = ({navigation}) => {
     },
     button: {
       backgroundColor: '#0066ff',
-      padding: 20,
+      padding: 10,
       alignItems: 'center',
       borderRadius: 16,
-      marginTop: 20,
+      marginTop: 10,
+      width: '50%',
+      alignSelf: 'center',
     },
     title: {
-      color: theme.text,
-      fontSize: 32,
-      lineHeight: 32,
-      marginBottom: 38,
+      color: '#fff',
+      fontFamily: 'Roboto',
+      textShadowColor: '#00000033',
+      textShadowOffset: {width: 1, height: 2},
+      textShadowRadius: 4,
+      letterSpacing: 1,
+      fontSize: 20,
+      fontWeight: 'bold',
+
+      marginTop: 10,
     },
 
     textButton: {
@@ -131,92 +138,112 @@ const Login: React.FC<LoginProps> = ({navigation}) => {
     buttonDisabled: {
       opacity: 0.7,
     },
+    dialoglogin: {
+      marginHorizontal: 24,
+      marginTop: 0.15 * windowHeight,
+      backgroundColor: theme.dialogBackground,
+      borderRadius: 20,
+      padding: 20,
+      elevation: 0, // Android shadow
+      shadowColor: '#000', // iOS shadow
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      zIndex: 2,
+    },
+    textbutton: {
+      color: '#007BFF',
+      fontWeight: 'bold',
+      fontSize: 12,
+      textAlign: 'right',
+      padding: 5,
+    },
   });
 
   return (
     <SafeAreaView style={styles.view}>
-      <View style={styles.container}>
-        <View
-          style={{
-            width: '100%',
-            height: 'auto',
-            paddingHorizontal: 20,
-            marginTop: 0.1 * windowHeight,
-          }}>
-          <Text style={styles.title}>{t('login.title')}</Text>
-
-          <View>
-            <InputBorder
-              name={t('login.username')}
-              iconSource={AppIcons.email}
-              placeholder={t('login.username')}
-              keyboardType="email-address"
-              onSetValue={value => handleChange('username', value)}
-              value={formData.username}
-              theme={theme}
-            />
-
-            <InputBorder
-              name={t('login.password')}
-              iconSource={AppIcons.password}
-              placeholder={t('login.password')}
-              secureVisible={invisible}
-              onSetValue={value => handleChange('password', value)}
-              value={formData.password}
-              theme={theme}
-              touchEyes={true}
-              onPressIcon={() => setInvisible(!invisible)}
-            />
+      <ImageBackground
+        source={AppIcons.bglogin}
+        style={{flex: 1, width: '100%', height: '100%'}}
+        resizeMode="cover">
+        <View style={styles.container}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 12,
+            }}>
+            <LogoSvg style={{marginLeft: 20, marginTop: 10}} />
+            <Text style={styles.title}>{t('CreditDemonName')}</Text>
           </View>
-          <View>
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.textButton}>{t('login.submit')}</Text>
-              )}
-            </TouchableOpacity>
-            <View style={styles.optionsNew}>
-              <Text style={{color: theme.noteText, fontSize: 14}}>
-                {t('login.newUser')}{' '}
-              </Text>
+          <View style={styles.dialoglogin}>
+            <View>
+              <InputBorder
+                name={t('login.username')}
+                iconSource={AppIcons.email}
+                placeholder={t('login.username')}
+                keyboardType="email-address"
+                onSetValue={value => handleChange('username', value)}
+                value={formData.username}
+                theme={theme}
+              />
+
+              <InputBorder
+                name={t('login.password')}
+                iconSource={AppIcons.password}
+                placeholder={t('login.password')}
+                secureVisible={invisible}
+                onSetValue={value => handleChange('password', value)}
+                value={formData.password}
+                theme={theme}
+                touchEyes={true}
+                onPressIcon={() => setInvisible(!invisible)}
+              />
+            </View>
+            <View>
               <TouchableOpacity
+                style={{alignSelf: 'flex-end'}}
                 onPress={() => {
-                  navigation.navigate('Register');
+                  navigation.navigate('ForgetPassword');
                 }}>
                 <Text
-                  style={{
-                    color: theme.textActive,
-                    fontWeight: 'bold',
-                    fontSize: 14,
-                    padding: 5,
-                  }}>
-                  {t('login.register')}
+                  style={styles.textbutton}>
+                  {t('login.forgotPassword')}
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={loading}>
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.textButton}>{t('login.submit')}</Text>
+                )}
+              </TouchableOpacity>
+              <View style={styles.optionsNew}>
+                <Text style={{color: theme.text, fontSize: 14}}>
+                  {t('login.newUser')}{' '}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate('Register');
+                  }}>
+                  <Text
+                    style={{
+                      color: '#007BFF',
+                      fontWeight: 'bold',
+                      fontSize: 14,
+                      padding: 5,
+                    }}>
+                    {t('login.register')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity
-              style={{alignSelf: 'center', marginTop: 8}}
-              onPress={() => {
-                navigation.navigate('ForgetPassword');
-              }}>
-              <Text
-                style={{
-                  color: theme.textActive,
-                  fontWeight: 'bold',
-                  fontSize: 14,
-                  textAlign: 'center',
-                  padding: 8,
-                }}>
-                {t('login.forgotPassword')}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </ImageBackground>
     </SafeAreaView>
   );
 };

@@ -137,16 +137,11 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
       try {
         const data = await getworkflowbyapplicationid<Apartment>(appId);
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
+          const createLoanStep = data.result[0].steps.find(
             step => step.name === 'add-asset-collateral',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
-          /*
-          // Check if there's existing data
-          if (formData.title || formData.proposedValue > 0) {
-            console.log('Existing data found, skipping update');
-            return; // Skip updating if there's existing data
-          }*/
+
           const lastValidHistory = Array.isArray(
             createLoanStep?.metadata?.histories,
           )
@@ -154,19 +149,6 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
                 ?.filter((history: History<Apartment>) => !history?.error)
                 .at(-1)
             : null;
-          console.log(
-            'financialData',
-            JSON.stringify(lastValidHistory, null, 2),
-          );
-          console.log(
-            'financialData',
-            JSON.stringify(
-              lastValidHistory?.response.approvalProcessResponse?.metadata[0]
-                ?.documents,
-              null,
-              2,
-            ),
-          );
           const metadata =
             lastValidHistory.response.approvalProcessResponse?.metadata[0];
           setFormData(prev => ({
@@ -238,23 +220,14 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
           // Thêm kiểm tra lastValidHistory có tồn tại và có files không
           if (metadata?.documents && metadata?.documents.length > 0) {
             try {
-              console.log(
-                'Files to fetch:',
-                JSON.stringify(metadata?.documents, null, 2),
-              );
               const documents = await getDocuments(metadata?.documents);
-              console.log('Raw documents response:', documents);
 
               if (Array.isArray(documents) && documents.length > 0) {
                 const formattedFiles = documents
                   .filter((doc: ApiResponse<UploadResponseResult>) => {
-                    // Thêm log để debug
-                    console.log('Checking doc:', doc);
                     return doc;
                   })
                   .map((doc: ApiResponse<UploadResponseResult>) => {
-                    // Thêm log để debug
-                    console.log('Mapping doc:', doc);
                     return {
                       uri: doc.result.url || '',
                       type: doc.result.type || 'application/octet-stream',
@@ -264,8 +237,6 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
                       source: 'server' as const,
                     };
                   });
-
-                console.log('Formatted files:', formattedFiles);
                 if (formattedFiles.length > 0) {
                   setSelectedFiles(formattedFiles); // Đặt state
                   // setDocumentIds(formattedFiles.map(f => f.uri)); // Cập nhật documentIds
@@ -342,17 +313,13 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
   const handleSubmit = async (_actionType: 'next' | 'update') => {
     try {
       setIsLoading(true);
-      console.log('formData next1');
       if (_actionType === 'next') {
-        console.log('formData next');
         const response = await addAssetCollateral(appId, formData);
         // Navigate to CreditRating with the appId
         if (response && navigation) {
           navigation.replace('InfoCreateLoan', {appId});
         }
       } else {
-        console.log('formData', JSON.stringify(formData, null, 2));
-
         const response = await updateAssetCollateral(
           appId,
           formData,
@@ -389,7 +356,9 @@ const FormApartmentFields: React.FC<FormApartmentFieldsProps> = ({
   };
 
   const getInputValue = (value: any): string => {
-    if (value === undefined || value === null) return '';
+    if (value === undefined || value === null) {
+      return '';
+    }
     return String(value);
   };
 

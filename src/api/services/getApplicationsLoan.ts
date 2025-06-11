@@ -51,7 +51,7 @@ export const getApprovalProcess = async (
 
     return response.data.result.content; // Return the full array
   } catch (error) {
-    console.log('Error fetching application:', (error as any).response);
+    console.error('Error fetching application:', (error as any).response);
     return undefined;
   }
 };

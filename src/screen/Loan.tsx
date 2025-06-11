@@ -25,7 +25,7 @@ import {useSelector} from 'react-redux';
 import {Application} from '../api/types/getApplications';
 import {Theme} from '../theme/colors';
 import {RouteProp, useFocusEffect} from '@react-navigation/native';
-import {useInfiniteQuery, useQuery} from '@tanstack/react-query';
+import {useQuery} from '@tanstack/react-query';
 
 type LoanScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Loan'>;
 
@@ -186,7 +186,9 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
   const transformApiDataToTableFormat = (
     apiData: Application[] | undefined,
   ): LoanBoxData[] => {
-    if (!apiData) return [];
+    if (!apiData) {
+      return [];
+    }
     return apiData.map((app, index) => ({
       id: index + 1,
       boxes: [
@@ -229,8 +231,6 @@ const Loan: React.FC<LoanProps> = ({navigation}) => {
 
   // Format the total amount with commas and currency symbol
   const totalLoanAmount = calculateTotalLoanAmount(data);
-
-  console.log(totalLoanAmount);
 
   const styles = StyleSheet.create({
     view: {

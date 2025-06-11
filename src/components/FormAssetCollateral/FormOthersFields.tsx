@@ -98,7 +98,7 @@ const FormOthersFields: React.FC<FormOthersFieldsProps> = ({
       try {
         const data = await getworkflowbyapplicationid<OtherAsset>(appId);
         if (data.result) {
-          const createLoanStep = data.result.steps.find(
+          const createLoanStep = data.result[0].steps.find(
             step => step.name === 'add-asset-collateral',
           );
           setTransactionId(createLoanStep?.transactionId ?? '');
@@ -240,8 +240,6 @@ const FormOthersFields: React.FC<FormOthersFieldsProps> = ({
           navigation.replace('InfoCreateLoan', {appId});
         }
       } else {
-        console.log('formData', JSON.stringify(formData, null, 2));
-
         const response = await updateAssetCollateral(
           appId,
           formData,
